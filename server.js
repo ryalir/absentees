@@ -117,37 +117,67 @@ app.get('/api/reports/student', async (req, res) => {
   try {
     const { year, section, rollNumber } = req.query;
 
-    const totalSessions = await Attendance.countDocuments({ year, section });
+    if (!year || !section || !rollNumber) {
+      return res.status(400).json({ error: 'year, section, and rollNumber are required.' });
+    }
 
-    const absentSessions = await Attendance.find({
+    const cleanRoll = rollNumber.trim();
+
+    // 1. Fetch total distinct dates where attendance was posted for this year & section
+    const distinctTotalDates = await Attendance.distinct('dateOnly', { year, section });
+    const totalSessions = distinctTotalDates.length;
+
+    // 2. Find all attendance documents where this student was marked absent
+    const records = await Attendance.find({
       year,
       section,
-      absentRollNumbers: rollNumber
-    }).sort({ dateTimeRecorded: -1 });
+      absentRollNumbers: cleanRoll
+    }).sort({ dateOnly: 1, period: 1 });
 
-    const totalAbsent = absentSessions.length;
-    const totalPresent = totalSessions - totalAbsent;
+    // 3. Group absent records by Date
+    const groupedByDate = {};
 
-    const presentPercentage = totalSessions > 0 ? ((totalPresent / totalSessions) * 100).toFixed(2) : '0.00';
-    const absentPercentage = totalSessions > 0 ? ((totalAbsent / totalSessions) * 100).toFixed(2) : '0.00';
-
-    const absentDetails = absentSessions.map(s => ({
-      date: s.dateOnly,
-      period: s.period,
-      sessionType: s.sessionType,
-      subject: s.subjectName,
-      faculty: s.facultyName
-    }));
-
-    res.json({
-      rollNumber,
-      totalSessions,
-      totalPresent,
-      totalAbsent,
-      presentPercentage: `${presentPercentage}%`,
-      absentPercentage: `${absentPercentage}%`,
-      absentDetails
+    records.forEach(record => {
+      const date = record.dateOnly;
+      if (!groupedByDate[date]) {
+        groupedByDate[date] = [];
+      }
+      groupedByDate[date].push(Number(record.period));
     });
+
+    // 4. Format date summary & calculate totals
+    const formattedAbsentDetails = Object.keys(groupedByDate).map(date => {
+      // Sort period numbers in ascending order (e.g. [1, 4, 5])
+      const sortedPeriods = groupedByDate[date].sort((a, b) => a - b);
+      return {
+        date: date,
+        periods: sortedPeriods, // Array of absent periods
+        periodCount: sortedPeriods.length
+      };
+    });
+
+    // Each unique absent date counts as 1 absent session
+    const totalAbsentSessions = formattedAbsentDetails.length;
+    const totalPresentSessions = Math.max(0, totalSessions - totalAbsentSessions);
+
+    const absentPercentage = totalSessions > 0 
+      ? ((totalAbsentSessions / totalSessions) * 100).toFixed(2) + '%' 
+      : '0%';
+      
+    const presentPercentage = totalSessions > 0 
+      ? ((totalPresentSessions / totalSessions) * 100).toFixed(2) + '%' 
+      : '0%';
+
+    res.status(200).json({
+      rollNumber: cleanRoll,
+      totalSessions,
+      totalAbsentSessions,
+      totalPresentSessions,
+      absentPercentage,
+      presentPercentage,
+      absentBreakdown: formattedAbsentDetails
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
