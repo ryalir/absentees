@@ -187,72 +187,96 @@ app.get('/api/reports/student', async (req, res) => {
 app.get('/api/reports/frequent-absentees', async (req, res) => {
   try {
     const { year, section } = req.query;
-    const records = await Attendance.find({ year, section }).sort({ dateOnly: 1 });
 
-    const studentDates = {};
+    if (!year || !section) {
+      return res.status(400).json({ error: 'year and section parameters are required.' });
+    }
 
-    records.forEach(rec => {
-      rec.absentRollNumbers.forEach(roll => {
-        if (!studentDates[roll]) studentDates[roll] = {};
-        if (!studentDates[roll][rec.dateOnly]) studentDates[roll][rec.dateOnly] = new Set();
-        studentDates[roll][rec.dateOnly].add(rec.sessionType);
-      });
+    // 1. Fetch all distinct dates attendance was taken for this year/section
+    const distinctDates = await Attendance.distinct('dateOnly', { year, section });
+    distinctDates.sort(); // Sort dates chronologically (oldest to newest)
+
+    if (distinctDates.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    // 2. Fetch all attendance records for this year & section
+    const allRecords = await Attendance.find({ year, section });
+
+    // 3. Extract all unique student roll numbers present across all records
+    const allRolls = new Set();
+    allRecords.forEach(r => {
+      r.absentRollNumbers.forEach(roll => allRolls.add(roll.trim()));
     });
 
     const frequentAbsentees = [];
 
-    const isConsecutive = (d1, d2) => {
-      const diff = (new Date(d2) - new Date(d1)) / (1000 * 60 * 60 * 24);
-      return diff === 1;
-    };
+    // Define Morning vs Afternoon period thresholds
+    const isMorningPeriod = (period) => (year === 'III' ? period <= 4 : period <= 3);
 
-    for (const [roll, datesMap] of Object.entries(studentDates)) {
-      const dates = Object.keys(datesMap).sort();
-      let streakMorning = 0;
-      let streakAfternoon = 0;
-      let streakFullDay = 0;
-
-      let isFlagged = false;
+    // 4. Evaluate each student's sequential session history
+    allRolls.forEach(rollNumber => {
+      let streakCount = 0;
+      let streakStartDate = null;
+      let streakStartSession = null;
+      let flagged = false;
       let flagReason = '';
 
-      for (let i = 0; i < dates.length; i++) {
-        const currentDate = dates[i];
-        const sessions = datesMap[currentDate];
-        const hasMorning = sessions.has('Morning');
-        const hasAfternoon = sessions.has('Afternoon');
-        const isFullDay = hasMorning && hasAfternoon;
+      // Loop chronologically date by date
+      for (const date of distinctDates) {
+        if (flagged) break; // Stop checking once flagged for 3 consecutive absent sessions
 
-        if (i === 0 || isConsecutive(dates[i - 1], currentDate)) {
-          streakMorning = hasMorning ? streakMorning + 1 : 0;
-          streakAfternoon = hasAfternoon ? streakAfternoon + 1 : 0;
-          streakFullDay = isFullDay ? streakFullDay + 1 : 0;
+        const dayRecords = allRecords.filter(r => r.dateOnly === date);
+
+        // Determine Morning Session status
+        const isAbsentMorning = dayRecords.some(r => isMorningPeriod(r.period) && r.absentRollNumbers.includes(rollNumber));
+
+        // Process Morning Session
+        if (isAbsentMorning) {
+          streakCount++;
+          if (streakCount === 1) {
+            streakStartDate = date;
+            streakStartSession = 'Morning';
+          }
+          if (streakCount >= 3) {
+            flagged = true;
+            flagReason = `Absent for 3 consecutive sessions starting on ${streakStartDate} (${streakStartSession} session)`;
+            break;
+          }
         } else {
-          streakMorning = hasMorning ? 1 : 0;
-          streakAfternoon = hasAfternoon ? 1 : 0;
-          streakFullDay = isFullDay ? 1 : 0;
+          streakCount = 0; // Reset streak if present
         }
 
-        if (streakFullDay >= 3) {
-          isFlagged = true;
-          flagReason = 'Absent for 3 Consecutive Full Days';
-          break;
-        } else if (streakMorning >= 3) {
-          isFlagged = true;
-          flagReason = 'Absent for 3 Consecutive Morning Sessions';
-          break;
-        } else if (streakAfternoon >= 3) {
-          isFlagged = true;
-          flagReason = 'Absent for 3 Consecutive Afternoon Sessions';
-          break;
+        // Determine Afternoon Session status
+        const isAbsentAfternoon = dayRecords.some(r => !isMorningPeriod(r.period) && r.absentRollNumbers.includes(rollNumber));
+
+        // Process Afternoon Session
+        if (isAbsentAfternoon) {
+          streakCount++;
+          if (streakCount === 1) {
+            streakStartDate = date;
+            streakStartSession = 'Afternoon';
+          }
+          if (streakCount >= 3) {
+            flagged = true;
+            flagReason = `Absent for 3 consecutive sessions starting on ${streakStartDate} (${streakStartSession} session)`;
+            break;
+          }
+        } else {
+          streakCount = 0; // Reset streak if present
         }
       }
 
-      if (isFlagged) {
-        frequentAbsentees.push({ rollNumber: roll, reason: flagReason });
+      if (flagged) {
+        frequentAbsentees.push({
+          rollNumber,
+          reason: flagReason
+        });
       }
-    }
+    });
 
-    res.json(frequentAbsentees);
+    res.status(200).json(frequentAbsentees);
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
