@@ -47,20 +47,28 @@ const Attendance = mongoose.model('Attendance', attendanceSchema, 'attendance');
 // 1. Submit Attendance POST API
 app.post('/api/attendance', async (req, res) => {
   try {
-    console.log('📥 Incoming Attendance POST Payload:', req.body);
-
     const { employeeId, facultyName, subjectName, year, section, period, sessionType, absentRollNumbers } = req.body;
 
-    if (!employeeId || !facultyName || !subjectName || !year || !section || !period || !sessionType) {
-      return res.status(400).json({ error: 'Missing required attendance fields.' });
+    const now = new Date();
+    const dateOnly = now.toISOString().split('T')[0];
+
+    // Check if attendance for this year, section, period, and date already exists
+    const existingEntry = await Attendance.findOne({
+      year,
+      section,
+      period: Number(period),
+      dateOnly
+    });
+
+    if (existingEntry) {
+      return res.status(400).json({ 
+        error: `Attendance for Year ${year}, Section ${section}, Period ${period} has already been posted today.` 
+      });
     }
 
     const absentList = typeof absentRollNumbers === 'string'
       ? absentRollNumbers.split(',').map(roll => roll.trim()).filter(Boolean)
       : (Array.isArray(absentRollNumbers) ? absentRollNumbers : []);
-
-    const now = new Date();
-    const dateOnly = now.toISOString().split('T')[0];
 
     const record = new Attendance({
       employeeId,
@@ -76,11 +84,8 @@ app.post('/api/attendance', async (req, res) => {
     });
 
     const savedRecord = await record.save();
-    console.log('✅ Successfully saved record to MongoDB:', savedRecord._id);
-
     res.status(201).json({ message: 'Attendance recorded successfully!', record: savedRecord });
   } catch (error) {
-    console.error('❌ Error saving attendance to MongoDB:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
