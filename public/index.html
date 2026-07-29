@@ -6,40 +6,202 @@
   <title>Daily Absentee Monitor</title>
   <style>
     * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background-color: #f4f7f6; margin: 0; padding: 0; display: flex; flex-direction: column; min-height: 100vh; }
     
-    /* Compact Header Styling */
-    header { background: #ffffff; width: 100%; border-bottom: 2px solid #0056b3; padding: 6px 10px; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-    .header-logo { width: 100%; max-width: 950px; height: auto; max-height: 140px; object-fit: contain; display: block; }
+    body { 
+      background-color: #f4f7f6; 
+      margin: 0; 
+      padding: 0; 
+      display: flex; 
+      flex-direction: column; 
+      min-height: 100vh; 
+    }
+    
+    /* Responsive Header & Banner */
+    header { 
+      background: #ffffff; 
+      width: 100%; 
+      border-bottom: 2px solid #0056b3; 
+      padding: 8px 12px; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08); 
+    }
 
-    /* Main Container */
-    .container { max-width: 950px; width: 100%; margin: 12px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); flex: 1; }
-    h2 { color: #2c3e50; margin-top: 0; }
+    .header-logo { 
+      width: 100%; 
+      max-width: 950px; 
+      height: auto; 
+      max-height: 140px; 
+      object-fit: contain; 
+      display: block; 
+    }
+
+    /* Adaptive Main Container */
+    .container { 
+      max-width: 950px; 
+      width: 94%; 
+      margin: 15px auto; 
+      background: #fff; 
+      padding: 20px; 
+      border-radius: 8px; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+      flex: 1; 
+    }
+
+    h2 { color: #2c3e50; margin-top: 0; font-size: 1.5rem; }
     .hidden { display: none !important; }
     .form-group { margin-bottom: 15px; }
-    label { display: block; margin-bottom: 5px; font-weight: 600; color: #34495e; }
-    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-    button { background-color: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: 600; color: #34495e; font-size: 0.95rem; }
+    
+    input, select, textarea { 
+      width: 100%; 
+      padding: 10px 12px; 
+      border: 1px solid #ccc; 
+      border-radius: 4px; 
+      font-size: 14px; 
+      min-height: 42px; /* Touch-friendly height */
+    }
+
+    button { 
+      background-color: #3498db; 
+      color: white; 
+      border: none; 
+      padding: 12px 18px; 
+      border-radius: 4px; 
+      cursor: pointer; 
+      font-weight: bold; 
+      width: 100%; 
+      font-size: 15px; 
+      min-height: 44px; /* Touch target standard */
+      transition: background 0.2s ease;
+    }
+
     button:hover { background-color: #2980b9; }
-    
-    /* Navigation Tabs */
-    .nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
-    .nav button { background: #ecf0f1; color: #2c3e50; width: auto; flex: 1; }
+
+    /* Responsive Grid Layouts for Inputs */
+    .form-row {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .form-row .form-group {
+      flex: 1;
+      min-width: 220px; /* Stacks automatically on small mobile screens */
+    }
+
+    /* Adaptive Navigation Tabs */
+    .nav { 
+      display: flex; 
+      gap: 8px; 
+      margin-bottom: 20px; 
+      border-bottom: 2px solid #ddd; 
+      padding-bottom: 10px; 
+      flex-wrap: wrap; /* Wraps cleanly on narrow screens */
+    }
+
+    .nav button { 
+      background: #ecf0f1; 
+      color: #2c3e50; 
+      width: auto; 
+      flex: 1 1 calc(50% - 8px); /* 2x2 grid on phones, 1 row on desktops */
+      font-size: 0.9rem;
+      padding: 10px;
+    }
+
     .nav button.active { background: #3498db; color: white; }
-    
-    /* Badge & Cards */
-    .user-badge { background: #e8f8f5; border: 1px solid #a3e4d7; color: #117a65; padding: 10px; border-radius: 4px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-    .badge-btn { width: auto; padding: 5px 10px; background: #e74c3c; font-size: 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
-    th { background: #f2f2f2; }
+
+    /* Controls Bar in Reports */
+    .report-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+
+    .report-controls select, 
+    .report-controls input {
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .report-controls button {
+      width: auto;
+      min-width: 120px;
+    }
+
+    /* Responsive Touch-Scrollable Table Container */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-top: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    table { width: 100%; border-collapse: collapse; min-width: 550px; }
+    th, td { border: 1px solid #ddd; padding: 10px 12px; text-align: left; font-size: 14px; }
+    th { background: #f2f2f2; font-weight: 600; }
+
+    /* User Badge & Cards */
+    .user-badge { 
+      background: #e8f8f5; 
+      border: 1px solid #a3e4d7; 
+      color: #117a65; 
+      padding: 12px 15px; 
+      border-radius: 4px; 
+      margin-bottom: 15px; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .badge-btn { width: auto; padding: 6px 12px; background: #e74c3c; font-size: 13px; min-height: 36px; }
     .alert { padding: 12px; background-color: #f8d7da; color: #721c24; border-radius: 4px; margin-top: 10px; }
     .success { padding: 12px; background-color: #d4edda; color: #155724; border-radius: 4px; margin-top: 10px; }
 
-    /* Footer Styling */
-    footer { background-color: #1a252f; color: #ecf0f1; text-align: center; padding: 18px 10px; margin-top: auto; font-size: 14px; border-top: 4px solid #3498db; }
-    .footer-content { max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 20px; align-items: center; }
+    /* Responsive Footer */
+    footer { 
+      background-color: #1a252f; 
+      color: #ecf0f1; 
+      text-align: center; 
+      padding: 16px 12px; 
+      margin-top: auto; 
+      font-size: 13px; 
+      border-top: 4px solid #3498db; 
+    }
+
+    .footer-content { 
+      max-width: 1000px; 
+      margin: 0 auto; 
+      display: flex; 
+      flex-wrap: wrap; 
+      justify-content: center; 
+      gap: 8px 15px; 
+      align-items: center; 
+    }
+
     .footer-item strong { color: #3498db; }
+    .divider { display: inline-block; }
+
+    /* MEDIA QUERIES FOR TABLETS & PHONES */
+    @media (max-width: 768px) {
+      .container { padding: 15px; width: 95%; margin: 10px auto; }
+      .nav button { flex: 1 1 100%; } /* Single full-width buttons on small phones */
+      .report-controls select, .report-controls input, .report-controls button { width: 100%; flex: 100%; }
+      .header-logo { max-height: 90px; }
+      .divider { display: none; } /* Hide vertical bar dividers on wrapped footer */
+      .footer-item { flex: 1 1 100%; margin: 2px 0; }
+    }
+
+    @media (min-width: 769px) {
+      .nav button { flex: 1; } /* Desktop 1-row nav tab layout */
+    }
   </style>
 </head>
 <body>
@@ -86,8 +248,8 @@
           <input type="text" id="autoDateTime" readonly disabled style="background:#e9ecef;">
         </div>
         
-        <div style="display: flex; gap: 15px;">
-          <div class="form-group" style="flex:1;">
+        <div class="form-row">
+          <div class="form-group">
             <label>Year:</label>
             <select id="yearSelect" onchange="updateOptions('yearSelect', 'sectionSelect', 'periodSelect')" required>
               <option value="">Select Year</option>
@@ -95,7 +257,7 @@
               <option value="IV">IV Year</option>
             </select>
           </div>
-          <div class="form-group" style="flex:1;">
+          <div class="form-group">
             <label>Section:</label>
             <select id="sectionSelect" required>
               <option value="">Select Section</option>
@@ -103,12 +265,12 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 15px;">
-          <div class="form-group" style="flex:1;">
+        <div class="form-row">
+          <div class="form-group">
             <label>Faculty Name:</label>
             <input type="text" id="facultyName" placeholder="Enter Faculty Name" required>
           </div>
-          <div class="form-group" style="flex:1;">
+          <div class="form-group">
             <label>Subject Name:</label>
             <input type="text" id="subjectName" placeholder="Enter Subject" required>
           </div>
@@ -132,14 +294,14 @@
     <!-- TAB 2: CLASS REPORT -->
     <div id="viewClass" class="hidden">
       <h2>Class Daily Report</h2>
-      <div style="display:flex; gap:10px; align-items:center;">
+      <div class="report-controls">
         <select id="rptYearSelect" onchange="updateSectionsOnly('rptYearSelect', 'rptSection')">
           <option value="III">III Year</option>
           <option value="IV">IV Year</option>
         </select>
         <select id="rptSection"></select>
         <input type="date" id="rptDate">
-        <button style="width: auto;" onclick="fetchClassReport()">Generate</button>
+        <button onclick="fetchClassReport()">Generate</button>
       </div>
       <div id="classReportResults"></div>
     </div>
@@ -147,14 +309,14 @@
     <!-- TAB 3: STUDENT CONSOLIDATED REPORT -->
     <div id="viewStudent" class="hidden">
       <h2>Student Consolidated Report</h2>
-      <div style="display:flex; gap:10px; align-items:center;">
+      <div class="report-controls">
         <select id="stuYearSelect" onchange="updateSectionsOnly('stuYearSelect', 'stuSection')">
           <option value="III">III Year</option>
           <option value="IV">IV Year</option>
         </select>
         <select id="stuSection"></select>
         <input type="text" id="stuRollNumber" placeholder="Roll Number (e.g. 101)">
-        <button style="width: auto;" onclick="fetchStudentReport()">Search</button>
+        <button onclick="fetchStudentReport()">Search</button>
       </div>
       <div id="studentReportResults"></div>
     </div>
@@ -162,14 +324,14 @@
     <!-- TAB 4: FREQUENT ABSENTEES REPORT -->
     <div id="viewAbsentees" class="hidden">
       <h2>Frequent Absentees Report</h2>
-      <p style="font-size:13px; color:#666;">(Students absent for 3 consecutive days in Morning, Afternoon, or Full Day)</p>
-      <div style="display:flex; gap:10px; align-items:center;">
+      <p style="font-size:13px; color:#666; margin-bottom: 12px;">(Students absent for 3 consecutive sessions in Morning, Afternoon, or Full Day)</p>
+      <div class="report-controls">
         <select id="absYearSelect" onchange="updateSectionsOnly('absYearSelect', 'absSection')">
           <option value="III">III Year</option>
           <option value="IV">IV Year</option>
         </select>
         <select id="absSection"></select>
-        <button style="width: auto;" onclick="fetchFrequentAbsentees()">Identify</button>
+        <button onclick="fetchFrequentAbsentees()">Identify</button>
       </div>
       <div id="absenteesResults"></div>
     </div>
@@ -181,25 +343,22 @@
 <footer>
   <div class="footer-content">
     <div class="footer-item"><strong>Developed By :</strong> Mr. R.S.V.V. PRASAD RAO</div>
-    <div class="footer-item">|</div>
-    <div class="footer-item"><strong>Hosted On :</strong> GitHub</div>
-    <div class="footer-item">|</div>
-    <div class="footer-item"><strong>Deployed On :</strong> Render</div>
-    <div class="footer-item">|</div>
+    <div class="divider">|</div>
+    <div class="footer-item"><strong>Hosted On :</strong> Render</div>
+    <div class="divider">|</div>
     <div class="footer-item"><strong>Database :</strong> MongoDB</div>
-    <div class="footer-item">|</div>
+    <div class="divider">|</div>
     <div class="footer-item"><strong>Front End :</strong> HTML</div>
-    <div class="footer-item">|</div>
+    <div class="divider">|</div>
     <div class="footer-item"><strong>Backend :</strong> Node.js</div>
   </div>
 </footer>
 
-  
 <script>
   let loggedInEmpId = '';
   const API_BASE_URL = window.location.origin;
 
-  // Handle Login
+  // Login handler
   document.getElementById('loginForm').addEventListener('submit', (e) => {
     e.preventDefault();
     loggedInEmpId = document.getElementById('employeeIdInput').value.trim();
@@ -209,7 +368,6 @@
       document.getElementById('appSection').classList.remove('hidden');
       updateDateTime();
       
-      // Initialize default dropdown options for all reports
       updateSectionsOnly('rptYearSelect', 'rptSection');
       updateSectionsOnly('stuYearSelect', 'stuSection');
       updateSectionsOnly('absYearSelect', 'absSection');
@@ -226,7 +384,6 @@
     document.getElementById('autoDateTime').value = new Date().toLocaleString();
   }
 
-  // Populate sections and periods for Attendance Entry Form
   function updateOptions(yearElemId, secElemId, periodElemId) {
     const year = document.getElementById(yearElemId).value;
     const sectionSelect = document.getElementById(secElemId);
@@ -250,22 +407,18 @@
     }
   }
 
-  // Populate sections dropdown ONLY (for Report tabs)
   function updateSectionsOnly(yearElemId, secElemId) {
     const year = document.getElementById(yearElemId).value;
     const sectionSelect = document.getElementById(secElemId);
     sectionSelect.innerHTML = '';
 
-    const sections = (year === 'III') 
-      ? ['A','B','C','D','E','F','G','H'] 
-      : ['A','B','C','D','E','F'];
-
+    const sections = (year === 'III') ? ['A','B','C','D','E','F','G','H'] : ['A','B','C','D','E','F'];
     sections.forEach(sec => {
       sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
     });
   }
 
-  // Submit Attendance (With Duplicate Check)
+  // Submit Attendance
   document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const statusDiv = document.getElementById('entryStatus');
@@ -282,11 +435,9 @@
     statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Checking existing records...</div>';
 
     try {
-      // 1. Fetch existing daily records for same Year, Section, and Date
       const checkRes = await fetch(`${API_BASE_URL}/api/reports/daily?year=${year}&section=${section}&date=${todayDate}`);
       const existingRecords = await checkRes.json();
 
-      // 2. Prevent duplicate posting
       const isAlreadyPosted = Array.isArray(existingRecords) && existingRecords.some(record => Number(record.period) === selectedPeriod);
 
       if (isAlreadyPosted) {
@@ -295,7 +446,6 @@
         return;
       }
 
-      // 3. Post to backend
       statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Submitting attendance...</div>';
 
       const payload = {
@@ -338,7 +488,7 @@
     document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
   }
 
-  // Fetch Reports
+  // Reports API Fetching
   async function fetchClassReport() {
     const yr = document.getElementById('rptYearSelect').value;
     const sec = document.getElementById('rptSection').value;
@@ -359,18 +509,19 @@
       }
 
       let html = `
-        <table>
-          <thead>
-            <tr>
-              <th>Period</th>
-              <th>Session</th>
-              <th>Subject</th>
-              <th>Employee ID</th>
-              <th>Faculty Name</th>
-              <th>Absent Roll Numbers</th>
-            </tr>
-          </thead>
-          <tbody>`;
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Session</th>
+                <th>Subject</th>
+                <th>Employee ID</th>
+                <th>Faculty Name</th>
+                <th>Absent Roll Numbers</th>
+              </tr>
+            </thead>
+            <tbody>`;
 
       records.forEach(r => {
         const absentees = r.absentRollNumbers && r.absentRollNumbers.length > 0 
@@ -388,7 +539,7 @@
           </tr>`;
       });
 
-      html += '</tbody></table>';
+      html += '</tbody></table></div>';
       document.getElementById('classReportResults').innerHTML = html;
 
     } catch (err) {
@@ -396,90 +547,104 @@
     }
   }
 
-async function fetchStudentReport() {
-  const yr = document.getElementById('stuYearSelect').value;
-  const sec = document.getElementById('stuSection').value;
-  const roll = document.getElementById('stuRollNumber').value.trim();
+  async function fetchStudentReport() {
+    const yr = document.getElementById('stuYearSelect').value;
+    const sec = document.getElementById('stuSection').value;
+    const roll = document.getElementById('stuRollNumber').value.trim();
 
-  if (!roll) {
-    alert("Please enter Roll Number.");
-    return;
-  }
-
-  const resultsDiv = document.getElementById('studentReportResults');
-  resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Searching student records...</div>';
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
-    const data = await res.json();
-
-    if (!res.ok) {
-      resultsDiv.innerHTML = `<div class="alert">${data.error || 'Failed to fetch report.'}</div>`;
+    if (!roll) {
+      alert("Please enter Roll Number.");
       return;
     }
 
-    // Consolidated Summary Display
-    let html = `
-      <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:6px; border:1px solid #e2e8f0;">
-        <p style="margin: 5px 0;"><strong>Roll Number:</strong> ${data.rollNumber}</p>
-        <p style="margin: 5px 0;"><strong>Total Recorded Days (Sessions):</strong> ${data.totalSessions}</p>
-        <p style="margin: 5px 0;"><strong>Present Days:</strong> ${data.totalPresentSessions} (${data.presentPercentage})</p>
-        <p style="margin: 5px 0; color: #c53030;"><strong>Absent Days (Sessions):</strong> ${data.totalAbsentSessions} (${data.absentPercentage})</p>
-      </div>
+    const resultsDiv = document.getElementById('studentReportResults');
+    resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Searching student records...</div>';
 
-      <h4 style="margin-top: 20px; color: #2c3e50;">Absent Breakdown by Date</h4>`;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
+      const data = await res.json();
 
-    if (!data.absentBreakdown || data.absentBreakdown.length === 0) {
-      html += '<div class="success">No absences recorded! 100% Attendance.</div>';
-    } else {
-      html += `
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Absent Periods (Ascending)</th>
-              <th>Total Periods Missed on Date</th>
-              <th>Session Count Contribution</th>
-            </tr>
-          </thead>
-          <tbody>`;
+      if (!res.ok) {
+        resultsDiv.innerHTML = `<div class="alert">${data.error || 'Failed to fetch report.'}</div>`;
+        return;
+      }
 
-      data.absentBreakdown.forEach(item => {
-        // Display periods formatted like: "Period 1, Period 4, Period 5"
-        const formattedPeriods = item.periods.map(p => `Period ${p}`).join(', ');
+      let html = `
+        <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:6px; border:1px solid #e2e8f0;">
+          <p style="margin: 5px 0;"><strong>Roll Number:</strong> ${data.rollNumber}</p>
+          <p style="margin: 5px 0;"><strong>Total Recorded Days (Sessions):</strong> ${data.totalSessions}</p>
+          <p style="margin: 5px 0;"><strong>Present Days:</strong> ${data.totalPresentSessions} (${data.presentPercentage})</p>
+          <p style="margin: 5px 0; color: #c53030;"><strong>Absent Days (Sessions):</strong> ${data.totalAbsentSessions} (${data.absentPercentage})</p>
+        </div>
 
+        <h4 style="margin-top: 20px; color: #2c3e50;">Absent Breakdown by Date</h4>`;
+
+      if (!data.absentBreakdown || data.absentBreakdown.length === 0) {
+        html += '<div class="success">No absences recorded! 100% Attendance.</div>';
+      } else {
         html += `
-          <tr>
-            <td><strong>${item.date}</strong></td>
-            <td><span style="color:#e53e3e; font-weight:600;">${formattedPeriods}</span></td>
-            <td>${item.periodCount} Period(s)</td>
-            <td><strong>1 Session</strong></td>
-          </tr>`;
-      });
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Absent Periods (Ascending)</th>
+                  <th>Total Periods Missed</th>
+                  <th>Session Contribution</th>
+                </tr>
+              </thead>
+              <tbody>`;
 
-      html += '</tbody></table>';
+        data.absentBreakdown.forEach(item => {
+          const formattedPeriods = item.periods.map(p => `Period ${p}`).join(', ');
+
+          html += `
+            <tr>
+              <td><strong>${item.date}</strong></td>
+              <td><span style="color:#e53e3e; font-weight:600;">${formattedPeriods}</span></td>
+              <td>${item.periodCount} Period(s)</td>
+              <td><strong>1 Session</strong></td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+      }
+
+      resultsDiv.innerHTML = html;
+
+    } catch (err) {
+      resultsDiv.innerHTML = `<div class="alert">Network Error: ${err.message}</div>`;
     }
-
-    resultsDiv.innerHTML = html;
-
-  } catch (err) {
-    resultsDiv.innerHTML = `<div class="alert">Network Error: ${err.message}</div>`;
   }
-}
 
   async function fetchFrequentAbsentees() {
     const yr = document.getElementById('absYearSelect').value;
     const sec = document.getElementById('absSection').value;
 
-    const res = await fetch(`${API_BASE_URL}/api/reports/frequent-absentees?year=${yr}&section=${sec}`);
-    const list = await res.json();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports/frequent-absentees?year=${yr}&section=${sec}`);
+      const list = await res.json();
 
-    let html = `<table><tr><th>Roll Number</th><th>Status Flag</th></tr>`;
-    (list || []).forEach(item => {
-      html += `<tr><td><strong>${item.rollNumber}</strong></td><td style="color:red;">${item.reason}</td></tr>`;
-    });
-    html += '</table>';
-    document.getElementById('absenteesResults').innerHTML = (list && list.length) ? html : '<div class="success">No frequent absentees found!</div>';
+      let html = `
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Roll Number</th>
+                <th>Status Flag</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      (list || []).forEach(item => {
+        html += `<tr><td><strong>${item.rollNumber}</strong></td><td style="color:red;">${item.reason}</td></tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      document.getElementById('absenteesResults').innerHTML = (list && list.length) ? html : '<div class="success">No frequent absentees found!</div>';
+    } catch (err) {
+      document.getElementById('absenteesResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
+    }
   }
 </script>
 
