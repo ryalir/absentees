@@ -3,11 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Attendance Portal</title>
+  <title>Daily Absentee Monitor</title>
   <style>
     * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body { background-color: #f4f7f6; margin: 0; padding: 20px; }
-    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    body { background-color: #f4f7f6; margin: 0; padding: 0; display: flex; flex-direction: column; min-height: 100vh; }
+    
+    /* Header Banner Styling */
+    header { background: #fff; width: 100%; border-bottom: 2px solid #e2e8f0; text-align: center; padding: 10px 0; }
+    .header-logo { max-width: 90%; width: 850px; height: auto; display: block; margin: 0 auto; border-radius: 6px; }
+
+    /* Main Container */
+    .container { max-width: 900px; width: 100%; margin: 25px auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); flex: 1; }
     h2 { color: #2c3e50; margin-top: 0; }
     .hidden { display: none !important; }
     .form-group { margin-bottom: 15px; }
@@ -16,10 +22,12 @@
     button { background-color: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 15px; }
     button:hover { background-color: #2980b9; }
     
+    /* Navigation Tabs */
     .nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
     .nav button { background: #ecf0f1; color: #2c3e50; width: auto; flex: 1; }
     .nav button.active { background: #3498db; color: white; }
     
+    /* Badge & Cards */
     .user-badge { background: #e8f8f5; border: 1px solid #a3e4d7; color: #117a65; padding: 10px; border-radius: 4px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
     .badge-btn { width: auto; padding: 5px 10px; background: #e74c3c; font-size: 12px; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
@@ -27,9 +35,20 @@
     th { background: #f2f2f2; }
     .alert { padding: 12px; background-color: #f8d7da; color: #721c24; border-radius: 4px; margin-top: 10px; }
     .success { padding: 12px; background-color: #d4edda; color: #155724; border-radius: 4px; margin-top: 10px; }
+
+    /* Footer Styling */
+    footer { background-color: #1a252f; color: #ecf0f1; text-align: center; padding: 20px 10px; margin-top: auto; font-size: 14px; border-top: 4px solid #3498db; }
+    .footer-content { max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px 25px; align-items: center; }
+    .footer-item { margin: 2px 0; }
+    .footer-item strong { color: #3498db; }
   </style>
 </head>
 <body>
+
+<!-- HEADER WITH WEBSITE LOGO BANNER -->
+<header>
+  <img src="logo.png" alt="Daily Absentee Monitor" class="header-logo">
+</header>
 
 <div class="container">
   <!-- LOGIN PAGE -->
@@ -148,9 +167,23 @@
   </div>
 </div>
 
+<!-- FOOTER SECTION -->
+<footer>
+  <div class="footer-content">
+    <div class="footer-item"><strong>Developed By :</strong> Mr. R.S.V.V. PRASAD RAO</div>
+    <div class="footer-item">|</div>
+    <div class="footer-item"><strong>Hosted On :</strong> Render</div>
+    <div class="footer-item">|</div>
+    <div class="footer-item"><strong>Database :</strong> MongoDB</div>
+    <div class="footer-item">|</div>
+    <div class="footer-item"><strong>Front End :</strong> HTML</div>
+    <div class="footer-item">|</div>
+    <div class="footer-item"><strong>Backend :</strong> Node.js</div>
+  </div>
+</footer>
+
 <script>
   let loggedInEmpId = '';
-  // Automatically resolves current host (Localhost or Render domain)
   const API_BASE_URL = window.location.origin;
 
   // Handle Login
