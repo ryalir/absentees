@@ -4,71 +4,60 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-
-// ==========================================
-// MIDDLEWARES
-// MUST be registered before declaring routes
-// ==========================================
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ==========================================
-// MONGODB CONFIGURATION & CONNECTION
-// ==========================================
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://satyaprasadryali_db_user:XUR8sgUQAc2qdgEp@cluster0.buejm5v.mongodb.net/student_attendance_db?retryWrites=true&w=majority&appName=Cluster0';
-
+// Connect to MongoDB
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/attendanceDB';
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB Atlas: student_attendance_db'))
-  .catch(err => console.error('❌ MongoDB Connection Error:', err));
+  .then(() => console.log('MongoDB connected successfully.'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
-// Schema & Collection Mapping
+// Attendance Schema & Model
 const attendanceSchema = new mongoose.Schema({
   employeeId: { type: String, required: true },
   facultyName: { type: String, required: true },
   subjectName: { type: String, required: true },
-  year: { type: String, enum: ['III', 'IV'], required: true },
+  year: { type: String, required: true },
   section: { type: String, required: true },
   period: { type: Number, required: true },
-  sessionType: { type: String, enum: ['Morning', 'Afternoon'], required: true },
-  absentRollNumbers: [{ type: String, trim: true }],
-  dateTimeRecorded: { type: Date, default: Date.now },
-  dateOnly: { type: String, required: true } // YYYY-MM-DD
+  sessionType: { type: String, required: true },
+  absentRollNumbers: [{ type: String }],
+  dateOnly: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now }
 });
 
-// Explicitly bind schema to 'attendance' collection in 'student_attendance_db'
-const Attendance = mongoose.model('Attendance', attendanceSchema, 'attendance');
+const Attendance = mongoose.model('Attendance', attendanceSchema);
 
-// ==========================================
-// API ROUTES
-// ==========================================
+// Helper: Check if period belongs to Morning session
+const isMorningPeriod = (year, period) => (year === 'III' ? period <= 4 : period <= 3);
 
-// 1. Submit Attendance POST API
+// -------------------------------------------------------------
+// API ENDPOINTS
+// -------------------------------------------------------------
+
+// 1. Submit Attendance
 app.post('/api/attendance', async (req, res) => {
   try {
     const { employeeId, facultyName, subjectName, year, section, period, sessionType, absentRollNumbers } = req.body;
 
-    const now = new Date();
-    const dateOnly = now.toISOString().split('T')[0];
-
-    // Check if attendance for this year, section, period, and date already exists
-    const existingEntry = await Attendance.findOne({
-      year,
-      section,
-      period: Number(period),
-      dateOnly
-    });
-
-    if (existingEntry) {
-      return res.status(400).json({ 
-        error: `Attendance for Year ${year}, Section ${section}, Period ${period} has already been posted today.` 
-      });
+    if (!employeeId || !facultyName || !subjectName || !year || !section || !period) {
+      return res.status(400).json({ error: 'All fields are required.' });
     }
 
-    const absentList = typeof absentRollNumbers === 'string'
-      ? absentRollNumbers.split(',').map(roll => roll.trim()).filter(Boolean)
-      : (Array.isArray(absentRollNumbers) ? absentRollNumbers : []);
+    const todayDate = new Date().toISOString().split('T')[0];
+
+    // Duplicate Check
+    const existing = await Attendance.findOne({ year, section, period: Number(period), dateOnly: todayDate });
+    if (existing) {
+      return res.status(400).json({ error: `Attendance for Year ${year}, Section ${section}, Period ${period} has already been posted today.` });
+    }
+
+    // Process absent roll numbers
+    const processedRolls = absentRollNumbers
+      ? absentRollNumbers.split(',').map(r => r.trim()).filter(r => r.length > 0)
+      : [];
 
     const record = new Attendance({
       employeeId,
@@ -78,91 +67,67 @@ app.post('/api/attendance', async (req, res) => {
       section,
       period: Number(period),
       sessionType,
-      absentRollNumbers: absentList,
-      dateTimeRecorded: now,
-      dateOnly
+      absentRollNumbers: processedRolls,
+      dateOnly: todayDate
     });
 
-    const savedRecord = await record.save();
-    res.status(201).json({ message: 'Attendance recorded successfully!', record: savedRecord });
+    await record.save();
+    res.status(201).json({ message: 'Attendance recorded successfully.', record });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 2. Class Daily Report GET API
+// 2. Class Daily Report
 app.get('/api/reports/daily', async (req, res) => {
   try {
     const { year, section, date } = req.query;
-
     if (!year || !section || !date) {
       return res.status(400).json({ error: 'year, section, and date query parameters are required.' });
     }
 
-    // Find attendance records matching year, section, and date
-    const records = await Attendance.find({
-      year: year,
-      section: section,
-      dateOnly: date
-    }).sort({ period: 1 }); // Sort chronologically by Period (1, 2, 3...)
-
+    const records = await Attendance.find({ year, section, dateOnly: date }).sort({ period: 1 });
     res.status(200).json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 3. Consolidated Student Report GET API
+// 3. Student Consolidated Report
 app.get('/api/reports/student', async (req, res) => {
   try {
     const { year, section, rollNumber } = req.query;
 
     if (!year || !section || !rollNumber) {
-      return res.status(400).json({ error: 'year, section, and rollNumber are required parameters.' });
+      return res.status(400).json({ error: 'year, section, and rollNumber are required.' });
     }
 
     const cleanRoll = rollNumber.trim();
-
-    // 1. Fetch all attendance records for the given year and section
     const classRecords = await Attendance.find({ year, section });
 
-    // If no attendance records exist at all for this year & section combination
     if (!classRecords || classRecords.length === 0) {
-      return res.status(440 || 404).json({ 
-        error: `No attendance records exist for ${year} Year - Section ${section}.` 
-      });
+      return res.status(404).json({ error: `No attendance records exist for ${year} Year - Section ${section}.` });
     }
 
-    // 2. Extract total distinct dates recorded for this year and section
     const distinctTotalDates = [...new Set(classRecords.map(r => r.dateOnly))];
     const totalSessions = distinctTotalDates.length;
 
-    // 3. Find records where this specific student was marked absent
     const absentRecords = classRecords.filter(r => 
       Array.isArray(r.absentRollNumbers) && r.absentRollNumbers.includes(cleanRoll)
     );
 
-    // 4. Verify if the roll number exists in any of the recorded documents for this year/section
-    // Note: If absentRecords has entries, student definitely exists.
-    // If absentRecords is empty, check if attendance has been posted for the class at all.
-    // Since roll numbers are submitted when marking attendance, if they were never absent, 
-    // they are 100% present ONLY IF the roll number is valid for that section.
-    
-    // Group absent records by Date
     const groupedByDate = {};
     absentRecords.forEach(record => {
       const date = record.dateOnly;
-      if (!groupedByDate[date]) {
-        groupedByDate[date] = [];
-      }
+      if (!groupedByDate[date]) groupedByDate[date] = [];
       groupedByDate[date].push(Number(record.period));
     });
 
-    // Format date summary & sort periods ascending
     const formattedAbsentDetails = Object.keys(groupedByDate).map(date => {
       const sortedPeriods = groupedByDate[date].sort((a, b) => a - b);
       return {
-        date: date,
+        date,
         periods: sortedPeriods,
         periodCount: sortedPeriods.length
       };
@@ -171,13 +136,8 @@ app.get('/api/reports/student', async (req, res) => {
     const totalAbsentSessions = formattedAbsentDetails.length;
     const totalPresentSessions = Math.max(0, totalSessions - totalAbsentSessions);
 
-    const absentPercentage = totalSessions > 0 
-      ? ((totalAbsentSessions / totalSessions) * 100).toFixed(2) + '%' 
-      : '0%';
-      
-    const presentPercentage = totalSessions > 0 
-      ? ((totalPresentSessions / totalSessions) * 100).toFixed(2) + '%' 
-      : '0%';
+    const absentPercentage = totalSessions > 0 ? ((totalAbsentSessions / totalSessions) * 100).toFixed(2) + '%' : '0%';
+    const presentPercentage = totalSessions > 0 ? ((totalPresentSessions / totalSessions) * 100).toFixed(2) + '%' : '0%';
 
     res.status(200).json({
       rollNumber: cleanRoll,
@@ -194,97 +154,66 @@ app.get('/api/reports/student', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-}); 
+});
 
-// 4. Frequent Absentees Report GET API (3 Consecutive Days Rule)
+// 4. Frequent Absentees Report (3 consecutive sessions)
 app.get('/api/reports/frequent-absentees', async (req, res) => {
   try {
     const { year, section } = req.query;
-
     if (!year || !section) {
-      return res.status(400).json({ error: 'year and section parameters are required.' });
+      return res.status(400).json({ error: 'year and section query parameters are required.' });
     }
 
-    // 1. Fetch all distinct dates attendance was taken for this year/section
-    const distinctDates = await Attendance.distinct('dateOnly', { year, section });
-    distinctDates.sort(); // Sort dates chronologically (oldest to newest)
+    const classRecords = await Attendance.find({ year, section }).sort({ dateOnly: 1 });
+    const dates = [...new Set(classRecords.map(r => r.dateOnly))].sort();
 
-    if (distinctDates.length === 0) {
-      return res.status(200).json([]);
-    }
+    const studentAbsences = {};
 
-    // 2. Fetch all attendance records for this year & section
-    const allRecords = await Attendance.find({ year, section });
+    dates.forEach(date => {
+      const dayRecords = classRecords.filter(r => r.dateOnly === date);
+      const morningRecords = dayRecords.filter(r => isMorningPeriod(year, r.period));
+      const afternoonRecords = dayRecords.filter(r => !isMorningPeriod(year, r.period));
 
-    // 3. Extract all unique student roll numbers present across all records
-    const allRolls = new Set();
-    allRecords.forEach(r => {
-      r.absentRollNumbers.forEach(roll => allRolls.add(roll.trim()));
+      const morningAbsent = new Set();
+      morningRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => morningAbsent.add(roll.trim())));
+
+      const afternoonAbsent = new Set();
+      afternoonRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => afternoonAbsent.add(roll.trim())));
+
+      const allRolls = new Set([...morningAbsent, ...afternoonAbsent]);
+
+      allRolls.forEach(roll => {
+        if (!studentAbsences[roll]) studentAbsences[roll] = { morning: 0, afternoon: 0, fullDay: 0, flaggedReason: null };
+
+        const isMorn = morningAbsent.has(roll);
+        const isAft = afternoonAbsent.has(roll);
+
+        if (isMorn && isAft) {
+          studentAbsences[roll].fullDay++;
+          studentAbsences[roll].morning++;
+          studentAbsences[roll].afternoon++;
+        } else if (isMorn) {
+          studentAbsences[roll].morning++;
+          studentAbsences[roll].fullDay = 0;
+        } else if (isAft) {
+          studentAbsences[roll].afternoon++;
+          studentAbsences[roll].fullDay = 0;
+        }
+
+        if (studentAbsences[roll].fullDay >= 3) {
+          studentAbsences[roll].flaggedReason = 'Absent 3 consecutive Full-Day sessions';
+        } else if (studentAbsences[roll].morning >= 3) {
+          studentAbsences[roll].flaggedReason = 'Absent 3 consecutive Morning sessions';
+        } else if (studentAbsences[roll].afternoon >= 3) {
+          studentAbsences[roll].flaggedReason = 'Absent 3 consecutive Afternoon sessions';
+        }
+      });
     });
 
     const frequentAbsentees = [];
-
-    // Define Morning vs Afternoon period thresholds
-    const isMorningPeriod = (period) => (year === 'III' ? period <= 4 : period <= 3);
-
-    // 4. Evaluate each student's sequential session history
-    allRolls.forEach(rollNumber => {
-      let streakCount = 0;
-      let streakStartDate = null;
-      let streakStartSession = null;
-      let flagged = false;
-      let flagReason = '';
-
-      // Loop chronologically date by date
-      for (const date of distinctDates) {
-        if (flagged) break; // Stop checking once flagged for 3 consecutive absent sessions
-
-        const dayRecords = allRecords.filter(r => r.dateOnly === date);
-
-        // Determine Morning Session status
-        const isAbsentMorning = dayRecords.some(r => isMorningPeriod(r.period) && r.absentRollNumbers.includes(rollNumber));
-
-        // Process Morning Session
-        if (isAbsentMorning) {
-          streakCount++;
-          if (streakCount === 1) {
-            streakStartDate = date;
-            streakStartSession = 'Morning';
-          }
-          if (streakCount >= 3) {
-            flagged = true;
-            flagReason = `Absent for 3 consecutive sessions starting on ${streakStartDate} (${streakStartSession} session)`;
-            break;
-          }
-        } else {
-          streakCount = 0; // Reset streak if present
-        }
-
-        // Determine Afternoon Session status
-        const isAbsentAfternoon = dayRecords.some(r => !isMorningPeriod(r.period) && r.absentRollNumbers.includes(rollNumber));
-
-        // Process Afternoon Session
-        if (isAbsentAfternoon) {
-          streakCount++;
-          if (streakCount === 1) {
-            streakStartDate = date;
-            streakStartSession = 'Afternoon';
-          }
-          if (streakCount >= 3) {
-            flagged = true;
-            flagReason = `Absent for 3 consecutive sessions starting on ${streakStartDate} (${streakStartSession} session)`;
-            break;
-          }
-        } else {
-          streakCount = 0; // Reset streak if present
-        }
-      }
-
-      if (flagged) {
-        frequentAbsentees.push({
-          rollNumber,
-          reason: flagReason
-        });
+    Object.keys(studentAbsences).forEach(roll => {
+      if (studentAbsences[roll].flaggedReason) {
+        frequentAbsentees.push({ rollNumber: roll, reason: studentAbsences[roll].flaggedReason });
       }
     });
 
@@ -295,11 +224,126 @@ app.get('/api/reports/frequent-absentees', async (req, res) => {
   }
 });
 
-// Fallback Route for Single Page App
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// 5. Morning Present / Afternoon Absent Report
+app.get('/api/reports/morning-present-afternoon-absent', async (req, res) => {
+  try {
+    const { year, section, date } = req.query;
+
+    if (!year || !section || !date) {
+      return res.status(400).json({ error: 'year, section, and date are required parameters.' });
+    }
+
+    const dayRecords = await Attendance.find({ year, section, dateOnly: date });
+
+    if (!dayRecords || dayRecords.length === 0) {
+      return res.status(200).json({ 
+        message: `No attendance records submitted for ${year} Year - Section ${section} on ${date}.`,
+        students: [] 
+      });
+    }
+
+    const morningRecords = dayRecords.filter(r => isMorningPeriod(year, r.period));
+    const afternoonRecords = dayRecords.filter(r => !isMorningPeriod(year, r.period));
+
+    const afternoonAbsentRolls = new Set();
+    afternoonRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => afternoonAbsentRolls.add(roll.trim())));
+
+    const morningAbsentRolls = new Set();
+    morningRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => morningAbsentRolls.add(roll.trim())));
+
+    const targetStudents = [];
+
+    afternoonAbsentRolls.forEach(rollNumber => {
+      if (!morningAbsentRolls.has(rollNumber)) {
+        const missedAfternoonPeriods = afternoonRecords
+          .filter(r => r.absentRollNumbers.includes(rollNumber))
+          .map(r => r.period)
+          .sort((a, b) => a - b);
+
+        targetStudents.push({ rollNumber, missedAfternoonPeriods });
+      }
+    });
+
+    res.status(200).json({
+      year,
+      section,
+      date,
+      totalFound: targetStudents.length,
+      students: targetStudents
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-// Dynamic Port Binding
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
+// 6. Home Dashboard: Very Frequent Absentees (>= 6 Morning Present & Afternoon Absent Sessions)
+app.get('/api/dashboard/frequent-afternoon-absentees', async (req, res) => {
+  try {
+    const allRecords = await Attendance.find({});
+
+    if (!allRecords || allRecords.length === 0) {
+      return res.status(200).json({ totalCount: 0, groupedData: {} });
+    }
+
+    const studentPartDaySessions = {};
+    const recordsByDay = {};
+
+    allRecords.forEach(r => {
+      const key = `${r.year}_${r.section}_${r.dateOnly}`;
+      if (!recordsByDay[key]) recordsByDay[key] = [];
+      recordsByDay[key].push(r);
+    });
+
+    Object.keys(recordsByDay).forEach(key => {
+      const [year, section, date] = key.split('_');
+      const dayRecords = recordsByDay[key];
+
+      const morningRecords = dayRecords.filter(r => isMorningPeriod(year, r.period));
+      const afternoonRecords = dayRecords.filter(r => !isMorningPeriod(year, r.period));
+
+      const morningAbsentRolls = new Set();
+      morningRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => morningAbsentRolls.add(roll.trim())));
+
+      const afternoonAbsentRolls = new Set();
+      afternoonRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => afternoonAbsentRolls.add(roll.trim())));
+
+      afternoonAbsentRolls.forEach(roll => {
+        if (!morningAbsentRolls.has(roll)) {
+          const studentKey = `${year}_${section}_${roll}`;
+          if (!studentPartDaySessions[studentKey]) {
+            studentPartDaySessions[studentKey] = new Set();
+          }
+          studentPartDaySessions[studentKey].add(date);
+        }
+      });
+    });
+
+    const groupedData = {};
+    let totalCount = 0;
+
+    Object.keys(studentPartDaySessions).forEach(studentKey => {
+      const [year, section, roll] = studentKey.split('_');
+      const sessionCount = studentPartDaySessions[studentKey].size;
+
+      if (sessionCount >= 6) {
+        const classGroup = `${year} Year - Section ${section}`;
+        if (!groupedData[classGroup]) groupedData[classGroup] = [];
+
+        groupedData[classGroup].push({
+          rollNumber: roll,
+          flaggedSessionsCount: sessionCount
+        });
+        totalCount++;
+      }
+    });
+
+    res.status(200).json({ totalCount, groupedData });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
