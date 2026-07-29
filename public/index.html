@@ -262,43 +262,70 @@ header {
   }
 
   // Submit Attendance (POST to Backend)
-  document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const statusDiv = document.getElementById('entryStatus');
-    statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Submitting...</div>';
+  // Submit Attendance (With Pre-submission Duplicate Check)
+document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const statusDiv = document.getElementById('entryStatus');
+  statusDiv.innerHTML = '';
 
-    const pSelect = document.getElementById('periodSelect');
-    const selectedOption = pSelect.options[pSelect.selectedIndex];
+  const year = document.getElementById('yearSelect').value;
+  const section = document.getElementById('sectionSelect').value;
+  const pSelect = document.getElementById('periodSelect');
+  const selectedPeriod = Number(pSelect.value);
+  const selectedOption = pSelect.options[pSelect.selectedIndex];
+  
+  // Format today's date to YYYY-MM-DD
+  const todayDate = new Date().toISOString().split('T')[0];
+
+  statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Checking existing records...</div>';
+
+  try {
+    // 1. Fetch existing daily records for same Year, Section, and Date
+    const checkRes = await fetch(`${API_BASE_URL}/api/reports/daily?year=${year}&section=${section}&date=${todayDate}`);
+    const existingRecords = await checkRes.json();
+
+    // 2. Check if a record already exists for the selected Period
+    const isAlreadyPosted = existingRecords.some(record => Number(record.period) === selectedPeriod);
+
+    if (isAlreadyPosted) {
+      // Alert the user and STOP sending data to server
+      alert(`⚠️ Attendance for Year ${year}, Section ${section}, Period ${selectedPeriod} has ALREADY been posted today!`);
+      statusDiv.innerHTML = `<div class="alert">Submission Blocked: Attendance for Period ${selectedPeriod} was already recorded today.</div>`;
+      return; // Stop further execution
+    }
+
+    // 3. If NOT posted, proceed with sending data to server
+    statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Submitting attendance...</div>';
 
     const payload = {
       employeeId: loggedInEmpId,
       facultyName: document.getElementById('facultyName').value,
       subjectName: document.getElementById('subjectName').value,
-      year: document.getElementById('yearSelect').value,
-      section: document.getElementById('sectionSelect').value,
-      period: pSelect.value,
+      year: year,
+      section: section,
+      period: selectedPeriod,
       sessionType: selectedOption.getAttribute('data-session'),
       absentRollNumbers: document.getElementById('absentRolls').value
     };
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/attendance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+    const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-      const data = await res.json();
-      if (res.ok) {
-        statusDiv.innerHTML = `<div class="success">Attendance recorded successfully in MongoDB!</div>`;
-        document.getElementById('absentRolls').value = '';
-      } else {
-        statusDiv.innerHTML = `<div class="alert">Error: ${data.error || 'Failed to submit.'}</div>`;
-      }
-    } catch (err) {
-      statusDiv.innerHTML = `<div class="alert">Network error: ${err.message}</div>`;
+    const data = await res.json();
+    if (res.ok) {
+      statusDiv.innerHTML = `<div class="success">Attendance recorded successfully in MongoDB!</div>`;
+      document.getElementById('absentRolls').value = '';
+    } else {
+      statusDiv.innerHTML = `<div class="alert">Error: ${data.error || 'Failed to submit.'}</div>`;
     }
-  });
+
+  } catch (err) {
+    statusDiv.innerHTML = `<div class="alert">Network error: ${err.message}</div>`;
+  }
+});
 
   // Tab Switcher
   function showTab(tabName) {
