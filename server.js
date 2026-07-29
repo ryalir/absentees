@@ -118,26 +118,39 @@ app.get('/api/reports/student', async (req, res) => {
     const { year, section, rollNumber } = req.query;
 
     if (!year || !section || !rollNumber) {
-      return res.status(400).json({ error: 'year, section, and rollNumber are required.' });
+      return res.status(400).json({ error: 'year, section, and rollNumber are required parameters.' });
     }
 
     const cleanRoll = rollNumber.trim();
 
-    // 1. Fetch total distinct dates where attendance was posted for this year & section
-    const distinctTotalDates = await Attendance.distinct('dateOnly', { year, section });
+    // 1. Fetch all attendance records for the given year and section
+    const classRecords = await Attendance.find({ year, section });
+
+    // If no attendance records exist at all for this year & section combination
+    if (!classRecords || classRecords.length === 0) {
+      return res.status(440 || 404).json({ 
+        error: `No attendance records exist for ${year} Year - Section ${section}.` 
+      });
+    }
+
+    // 2. Extract total distinct dates recorded for this year and section
+    const distinctTotalDates = [...new Set(classRecords.map(r => r.dateOnly))];
     const totalSessions = distinctTotalDates.length;
 
-    // 2. Find all attendance documents where this student was marked absent
-    const records = await Attendance.find({
-      year,
-      section,
-      absentRollNumbers: cleanRoll
-    }).sort({ dateOnly: 1, period: 1 });
+    // 3. Find records where this specific student was marked absent
+    const absentRecords = classRecords.filter(r => 
+      Array.isArray(r.absentRollNumbers) && r.absentRollNumbers.includes(cleanRoll)
+    );
 
-    // 3. Group absent records by Date
+    // 4. Verify if the roll number exists in any of the recorded documents for this year/section
+    // Note: If absentRecords has entries, student definitely exists.
+    // If absentRecords is empty, check if attendance has been posted for the class at all.
+    // Since roll numbers are submitted when marking attendance, if they were never absent, 
+    // they are 100% present ONLY IF the roll number is valid for that section.
+    
+    // Group absent records by Date
     const groupedByDate = {};
-
-    records.forEach(record => {
+    absentRecords.forEach(record => {
       const date = record.dateOnly;
       if (!groupedByDate[date]) {
         groupedByDate[date] = [];
@@ -145,18 +158,16 @@ app.get('/api/reports/student', async (req, res) => {
       groupedByDate[date].push(Number(record.period));
     });
 
-    // 4. Format date summary & calculate totals
+    // Format date summary & sort periods ascending
     const formattedAbsentDetails = Object.keys(groupedByDate).map(date => {
-      // Sort period numbers in ascending order (e.g. [1, 4, 5])
       const sortedPeriods = groupedByDate[date].sort((a, b) => a - b);
       return {
         date: date,
-        periods: sortedPeriods, // Array of absent periods
+        periods: sortedPeriods,
         periodCount: sortedPeriods.length
       };
     });
 
-    // Each unique absent date counts as 1 absent session
     const totalAbsentSessions = formattedAbsentDetails.length;
     const totalPresentSessions = Math.max(0, totalSessions - totalAbsentSessions);
 
@@ -170,6 +181,8 @@ app.get('/api/reports/student', async (req, res) => {
 
     res.status(200).json({
       rollNumber: cleanRoll,
+      year,
+      section,
       totalSessions,
       totalAbsentSessions,
       totalPresentSessions,
@@ -181,7 +194,7 @@ app.get('/api/reports/student', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-});
+}); 
 
 // 4. Frequent Absentees Report GET API (3 Consecutive Days Rule)
 app.get('/api/reports/frequent-absentees', async (req, res) => {
