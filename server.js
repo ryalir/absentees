@@ -2,29 +2,56 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const Attendance = require('./models/Attendance');
 
 const app = express();
+
+// Middlewares
 app.use(express.json());
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// UPDATE YOUR MONGO CONNECTION STRING HERE
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/student_attendance_db';
+// ==========================================
+// MONGODB CONFIGURATION & CONNECTION
+// ==========================================
+// Your provided MongoDB Atlas connection string configured for student_attendance_db database
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://satyaprasadryali_db_user:XUR8sgUQAc2qdgEp@cluster0.buejm5v.mongodb.net/student_attendance_db?retryWrites=true&w=majority&appName=Cluster0';
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('MongoDB Connected Successfully'))
+  .then(() => console.log('Successfully connected to MongoDB Atlas (database: student_attendance_db)'))
   .catch(err => console.error('MongoDB Connection Error:', err));
 
-// 1. Submit Attendance API
+// ==========================================
+// MONGOOSE SCHEMA & MODEL
+// Explicitly mapping to the 'attendance' collection
+// ==========================================
+const attendanceSchema = new mongoose.Schema({
+  employeeId: { type: String, required: true },
+  facultyName: { type: String, required: true },
+  subjectName: { type: String, required: true },
+  year: { type: String, enum: ['III', 'IV'], required: true },
+  section: { type: String, required: true },
+  period: { type: Number, required: true },
+  sessionType: { type: String, enum: ['Morning', 'Afternoon'], required: true },
+  absentRollNumbers: [{ type: String, trim: true }],
+  dateTimeRecorded: { type: Date, default: Date.now },
+  dateOnly: { type: String, required: true } // YYYY-MM-DD
+});
+
+// Explicitly bind schema to the 'attendance' collection
+const Attendance = mongoose.model('Attendance', attendanceSchema, 'attendance');
+
+// ==========================================
+// API ENDPOINTS
+// ==========================================
+
+// 1. Submit Attendance
 app.post('/api/attendance', async (req, res) => {
   try {
     const { employeeId, facultyName, subjectName, year, section, period, sessionType, absentRollNumbers } = req.body;
-    
-    // Parse comma-separated list
-    const absentList = absentRollNumbers
+
+    const absentList = typeof absentRollNumbers === 'string'
       ? absentRollNumbers.split(',').map(roll => roll.trim()).filter(Boolean)
-      : [];
+      : (Array.isArray(absentRollNumbers) ? absentRollNumbers : []);
 
     const now = new Date();
     const dateOnly = now.toISOString().split('T')[0];
@@ -35,7 +62,7 @@ app.post('/api/attendance', async (req, res) => {
       subjectName,
       year,
       section,
-      period,
+      period: Number(period),
       sessionType,
       absentRollNumbers: absentList,
       dateTimeRecorded: now,
@@ -49,26 +76,27 @@ app.post('/api/attendance', async (req, res) => {
   }
 });
 
-// 2. Class Daily Report API
+// 2. Class Daily Report
 app.get('/api/reports/daily', async (req, res) => {
   try {
     const { year, section, date } = req.query;
-    const records = await Attendance.find({ year, section, dateOnly: date }).sort({ period: 1 });
+    const query = { year, section };
+    if (date) query.dateOnly = date;
+
+    const records = await Attendance.find(query).sort({ period: 1 });
     res.json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// 3. Consolidated Student Report API
+// 3. Consolidated Student Report
 app.get('/api/reports/student', async (req, res) => {
   try {
     const { year, section, rollNumber } = req.query;
-    
-    // Get total class sessions conducted for this year and section
+
     const totalSessions = await Attendance.countDocuments({ year, section });
-    
-    // Find sessions where the student was absent
+
     const absentSessions = await Attendance.find({
       year,
       section,
@@ -77,9 +105,9 @@ app.get('/api/reports/student', async (req, res) => {
 
     const totalAbsent = absentSessions.length;
     const totalPresent = totalSessions - totalAbsent;
-    
-    const presentPercentage = totalSessions > 0 ? ((totalPresent / totalSessions) * 100).toFixed(2) : 0;
-    const absentPercentage = totalSessions > 0 ? ((totalAbsent / totalSessions) * 100).toFixed(2) : 0;
+
+    const presentPercentage = totalSessions > 0 ? ((totalPresent / totalSessions) * 100).toFixed(2) : '0.00';
+    const absentPercentage = totalSessions > 0 ? ((totalAbsent / totalSessions) * 100).toFixed(2) : '0.00';
 
     const absentDetails = absentSessions.map(s => ({
       date: s.dateOnly,
@@ -103,14 +131,13 @@ app.get('/api/reports/student', async (req, res) => {
   }
 });
 
-// 4. Frequent Absentees API (3 Consecutive Days in Morning/Afternoon/Full Day)
+// 4. Frequent Absentees Report (3 Consecutive Days Rule)
 app.get('/api/reports/frequent-absentees', async (req, res) => {
   try {
     const { year, section } = req.query;
     const records = await Attendance.find({ year, section }).sort({ dateOnly: 1 });
 
-    // Group absent instances by date and student
-    const studentDates = {}; // { rollNo: { 'YYYY-MM-DD': Set(['Morning', 'Afternoon']) } }
+    const studentDates = {};
 
     records.forEach(rec => {
       rec.absentRollNumbers.forEach(roll => {
@@ -122,7 +149,6 @@ app.get('/api/reports/frequent-absentees', async (req, res) => {
 
     const frequentAbsentees = [];
 
-    // Helper to check 3 consecutive dates
     const isConsecutive = (d1, d2) => {
       const diff = (new Date(d2) - new Date(d1)) / (1000 * 60 * 60 * 24);
       return diff === 1;
@@ -180,5 +206,11 @@ app.get('/api/reports/frequent-absentees', async (req, res) => {
   }
 });
 
+// Fallback Route for Single-Page Frontend Application
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Dynamic Port Binding for Render Deployment
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
