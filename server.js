@@ -94,11 +94,19 @@ app.post('/api/attendance', async (req, res) => {
 app.get('/api/reports/daily', async (req, res) => {
   try {
     const { year, section, date } = req.query;
-    const query = { year, section };
-    if (date) query.dateOnly = date;
 
-    const records = await Attendance.find(query).sort({ period: 1 });
-    res.json(records);
+    if (!year || !section || !date) {
+      return res.status(400).json({ error: 'year, section, and date query parameters are required.' });
+    }
+
+    // Find attendance records matching year, section, and date
+    const records = await Attendance.find({
+      year: year,
+      section: section,
+      dateOnly: date
+    }).sort({ period: 1 }); // Sort chronologically by Period (1, 2, 3...)
+
+    res.status(200).json(records);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
