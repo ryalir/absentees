@@ -5,25 +5,25 @@ const path = require('path');
 
 const app = express();
 
-// Middlewares
-app.use(express.json());
+// ==========================================
+// MIDDLEWARES
+// MUST be registered before declaring routes
+// ==========================================
 app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==========================================
 // MONGODB CONFIGURATION & CONNECTION
 // ==========================================
-// Your provided MongoDB Atlas connection string configured for student_attendance_db database
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://satyaprasadryali_db_user:XUR8sgUQAc2qdgEp@cluster0.buejm5v.mongodb.net/student_attendance_db?retryWrites=true&w=majority&appName=Cluster0';
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('Successfully connected to MongoDB Atlas (database: student_attendance_db)'))
-  .catch(err => console.error('MongoDB Connection Error:', err));
+  .then(() => console.log('✅ Connected to MongoDB Atlas: student_attendance_db'))
+  .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
-// ==========================================
-// MONGOOSE SCHEMA & MODEL
-// Explicitly mapping to the 'attendance' collection
-// ==========================================
+// Schema & Collection Mapping
 const attendanceSchema = new mongoose.Schema({
   employeeId: { type: String, required: true },
   facultyName: { type: String, required: true },
@@ -37,17 +37,23 @@ const attendanceSchema = new mongoose.Schema({
   dateOnly: { type: String, required: true } // YYYY-MM-DD
 });
 
-// Explicitly bind schema to the 'attendance' collection
+// Explicitly bind schema to 'attendance' collection in 'student_attendance_db'
 const Attendance = mongoose.model('Attendance', attendanceSchema, 'attendance');
 
 // ==========================================
-// API ENDPOINTS
+// API ROUTES
 // ==========================================
 
-// 1. Submit Attendance
+// 1. Submit Attendance POST API
 app.post('/api/attendance', async (req, res) => {
   try {
+    console.log('📥 Incoming Attendance POST Payload:', req.body);
+
     const { employeeId, facultyName, subjectName, year, section, period, sessionType, absentRollNumbers } = req.body;
+
+    if (!employeeId || !facultyName || !subjectName || !year || !section || !period || !sessionType) {
+      return res.status(400).json({ error: 'Missing required attendance fields.' });
+    }
 
     const absentList = typeof absentRollNumbers === 'string'
       ? absentRollNumbers.split(',').map(roll => roll.trim()).filter(Boolean)
@@ -69,14 +75,17 @@ app.post('/api/attendance', async (req, res) => {
       dateOnly
     });
 
-    await record.save();
-    res.status(201).json({ message: 'Attendance recorded successfully!', record });
+    const savedRecord = await record.save();
+    console.log('✅ Successfully saved record to MongoDB:', savedRecord._id);
+
+    res.status(201).json({ message: 'Attendance recorded successfully!', record: savedRecord });
   } catch (error) {
+    console.error('❌ Error saving attendance to MongoDB:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
-// 2. Class Daily Report
+// 2. Class Daily Report GET API
 app.get('/api/reports/daily', async (req, res) => {
   try {
     const { year, section, date } = req.query;
@@ -90,7 +99,7 @@ app.get('/api/reports/daily', async (req, res) => {
   }
 });
 
-// 3. Consolidated Student Report
+// 3. Consolidated Student Report GET API
 app.get('/api/reports/student', async (req, res) => {
   try {
     const { year, section, rollNumber } = req.query;
@@ -131,7 +140,7 @@ app.get('/api/reports/student', async (req, res) => {
   }
 });
 
-// 4. Frequent Absentees Report (3 Consecutive Days Rule)
+// 4. Frequent Absentees Report GET API (3 Consecutive Days Rule)
 app.get('/api/reports/frequent-absentees', async (req, res) => {
   try {
     const { year, section } = req.query;
@@ -206,11 +215,11 @@ app.get('/api/reports/frequent-absentees', async (req, res) => {
   }
 });
 
-// Fallback Route for Single-Page Frontend Application
+// Fallback Route for Single Page App
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Dynamic Port Binding for Render Deployment
+// Dynamic Port Binding
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
