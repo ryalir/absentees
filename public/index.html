@@ -339,19 +339,62 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
 
   // Fetch Reports
   async function fetchClassReport() {
-    const yr = document.getElementById('rptYearSelect').value;
-    const sec = document.getElementById('rptSection').value;
-    const dt = document.getElementById('rptDate').value;
+  const yr = document.getElementById('rptYearSelect').value;
+  const sec = document.getElementById('rptSection').value;
+  const dt = document.getElementById('rptDate').value;
 
+  if (!sec || !dt) {
+    alert("Please enter Section and select a Date.");
+    return;
+  }
+
+  try {
     const res = await fetch(`${API_BASE_URL}/api/reports/daily?year=${yr}&section=${sec}&date=${dt}`);
     const records = await res.json();
-    let html = `<table><tr><th>Period</th><th>Session</th><th>Subject</th><th>Faculty</th><th>Absentees</th></tr>`;
+
+    if (!records || records.length === 0) {
+      document.getElementById('classReportResults').innerHTML = '<div class="alert">No attendance records found for the selected criteria.</div>';
+      return;
+    }
+
+    // Updated Table Headers including 'Employee ID'
+    let html = `
+      <table style="margin-top: 15px; width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th>Period</th>
+            <th>Session</th>
+            <th>Subject</th>
+            <th>Employee ID</th>
+            <th>Faculty Name</th>
+            <th>Absent Roll Numbers</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
     records.forEach(r => {
-      html += `<tr><td>${r.period}</td><td>${r.sessionType}</td><td>${r.subjectName}</td><td>${r.facultyName}</td><td>${r.absentRollNumbers.join(', ') || 'Nil'}</td></tr>`;
+      const absentees = r.absentRollNumbers && r.absentRollNumbers.length > 0 
+        ? r.absentRollNumbers.join(', ') 
+        : '<span style="color: green; font-weight: bold;">Nil</span>';
+
+      html += `
+        <tr>
+          <td><strong>Period ${r.period}</strong></td>
+          <td>${r.sessionType || 'N/A'}</td>
+          <td>${r.subjectName || 'N/A'}</td>
+          <td><code>${r.employeeId || 'N/A'}</code></td>
+          <td>${r.facultyName || 'N/A'}</td>
+          <td>${absentees}</td>
+        </tr>`;
     });
-    html += '</table>';
-    document.getElementById('classReportResults').innerHTML = records.length ? html : '<div class="alert">No records found.</div>';
+
+    html += '</tbody></table>';
+    document.getElementById('classReportResults').innerHTML = html;
+
+  } catch (err) {
+    document.getElementById('classReportResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
   }
+}
 
   async function fetchStudentReport() {
     const yr = document.getElementById('stuYearSelect').value;
