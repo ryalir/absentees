@@ -8,41 +8,12 @@
     * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     body { background-color: #f4f7f6; margin: 0; padding: 0; display: flex; flex-direction: column; min-height: 100vh; }
     
-    /* Header Banner Styling */
     /* Compact Header Styling */
-header {
-  background: #ffffff;
-  width: 100%;
-  border-bottom: 2px solid #0056b3;
-  padding: 8px 15px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-}
-
-.header-logo {
-  max-width: 100%;
-  width: 1150px; /* Reduced width for a tight, elegant fit */
-  height: auto;
-  max-height: 80px; /* Restricts maximum vertical height to prevent wasted space */
-  object-fit: contain;
-  display: block;
-}
-
-/* Reduced Container Top Margin */
+    header { background: #ffffff; width: 100%; border-bottom: 2px solid #0056b3; padding: 6px 10px; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .header-logo { width: 100%; max-width: 950px; height: auto; max-height: 140px; object-fit: contain; display: block; }
 
     /* Main Container */
-    .container {
-  max-width: 900px;
-  width: 100%;
-  margin: 15px auto; /* Reduced top/bottom margin */
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  flex: 1;
-}
+    .container { max-width: 950px; width: 100%; margin: 12px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); flex: 1; }
     h2 { color: #2c3e50; margin-top: 0; }
     .hidden { display: none !important; }
     .form-group { margin-bottom: 15px; }
@@ -66,9 +37,8 @@ header {
     .success { padding: 12px; background-color: #d4edda; color: #155724; border-radius: 4px; margin-top: 10px; }
 
     /* Footer Styling */
-    footer { background-color: #1a252f; color: #ecf0f1; text-align: center; padding: 20px 10px; margin-top: auto; font-size: 14px; border-top: 4px solid #3498db; }
-    .footer-content { max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px 25px; align-items: center; }
-    .footer-item { margin: 2px 0; }
+    footer { background-color: #1a252f; color: #ecf0f1; text-align: center; padding: 18px 10px; margin-top: auto; font-size: 14px; border-top: 4px solid #3498db; }
+    .footer-content { max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 20px; align-items: center; }
     .footer-item strong { color: #3498db; }
   </style>
 </head>
@@ -119,7 +89,7 @@ header {
         <div style="display: flex; gap: 15px;">
           <div class="form-group" style="flex:1;">
             <label>Year:</label>
-            <select id="yearSelect" onchange="updateOptions()" required>
+            <select id="yearSelect" onchange="updateOptions('yearSelect', 'sectionSelect', 'periodSelect')" required>
               <option value="">Select Year</option>
               <option value="III">III Year</option>
               <option value="IV">IV Year</option>
@@ -127,7 +97,9 @@ header {
           </div>
           <div class="form-group" style="flex:1;">
             <label>Section:</label>
-            <select id="sectionSelect" required></select>
+            <select id="sectionSelect" required>
+              <option value="">Select Section</option>
+            </select>
           </div>
         </div>
 
@@ -160,9 +132,12 @@ header {
     <!-- TAB 2: CLASS REPORT -->
     <div id="viewClass" class="hidden">
       <h2>Class Daily Report</h2>
-      <div style="display:flex; gap:10px;">
-        <select id="rptYearSelect"><option value="III">III Year</option><option value="IV">IV Year</option></select>
-        <input type="text" id="rptSection" placeholder="Section (e.g. A)">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select id="rptYearSelect" onchange="updateSectionsOnly('rptYearSelect', 'rptSection')">
+          <option value="III">III Year</option>
+          <option value="IV">IV Year</option>
+        </select>
+        <select id="rptSection"></select>
         <input type="date" id="rptDate">
         <button style="width: auto;" onclick="fetchClassReport()">Generate</button>
       </div>
@@ -172,9 +147,12 @@ header {
     <!-- TAB 3: STUDENT CONSOLIDATED REPORT -->
     <div id="viewStudent" class="hidden">
       <h2>Student Consolidated Report</h2>
-      <div style="display:flex; gap:10px;">
-        <select id="stuYearSelect"><option value="III">III Year</option><option value="IV">IV Year</option></select>
-        <input type="text" id="stuSection" placeholder="Section (e.g. A)">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select id="stuYearSelect" onchange="updateSectionsOnly('stuYearSelect', 'stuSection')">
+          <option value="III">III Year</option>
+          <option value="IV">IV Year</option>
+        </select>
+        <select id="stuSection"></select>
         <input type="text" id="stuRollNumber" placeholder="Roll Number (e.g. 101)">
         <button style="width: auto;" onclick="fetchStudentReport()">Search</button>
       </div>
@@ -185,9 +163,12 @@ header {
     <div id="viewAbsentees" class="hidden">
       <h2>Frequent Absentees Report</h2>
       <p style="font-size:13px; color:#666;">(Students absent for 3 consecutive days in Morning, Afternoon, or Full Day)</p>
-      <div style="display:flex; gap:10px;">
-        <select id="absYearSelect"><option value="III">III Year</option><option value="IV">IV Year</option></select>
-        <input type="text" id="absSection" placeholder="Section (e.g. A)">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select id="absYearSelect" onchange="updateSectionsOnly('absYearSelect', 'absSection')">
+          <option value="III">III Year</option>
+          <option value="IV">IV Year</option>
+        </select>
+        <select id="absSection"></select>
         <button style="width: auto;" onclick="fetchFrequentAbsentees()">Identify</button>
       </div>
       <div id="absenteesResults"></div>
@@ -224,6 +205,11 @@ header {
       document.getElementById('loginSection').classList.add('hidden');
       document.getElementById('appSection').classList.remove('hidden');
       updateDateTime();
+      
+      // Initialize default dropdown options for all reports
+      updateSectionsOnly('rptYearSelect', 'rptSection');
+      updateSectionsOnly('stuYearSelect', 'stuSection');
+      updateSectionsOnly('absYearSelect', 'absSection');
     }
   });
 
@@ -237,11 +223,11 @@ header {
     document.getElementById('autoDateTime').value = new Date().toLocaleString();
   }
 
-  // Dynamic Rule Options (Year/Section/Periods)
-  function updateOptions() {
-    const year = document.getElementById('yearSelect').value;
-    const sectionSelect = document.getElementById('sectionSelect');
-    const periodSelect = document.getElementById('periodSelect');
+  // Populate sections and periods for Attendance Entry Form
+  function updateOptions(yearElemId, secElemId, periodElemId) {
+    const year = document.getElementById(yearElemId).value;
+    const sectionSelect = document.getElementById(secElemId);
+    const periodSelect = document.getElementById(periodElemId);
 
     sectionSelect.innerHTML = '';
     periodSelect.innerHTML = '';
@@ -261,71 +247,83 @@ header {
     }
   }
 
-  // Submit Attendance (POST to Backend)
-  // Submit Attendance (With Pre-submission Duplicate Check)
-document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const statusDiv = document.getElementById('entryStatus');
-  statusDiv.innerHTML = '';
+  // Populate sections dropdown ONLY (for Report tabs)
+  function updateSectionsOnly(yearElemId, secElemId) {
+    const year = document.getElementById(yearElemId).value;
+    const sectionSelect = document.getElementById(secElemId);
+    sectionSelect.innerHTML = '';
 
-  const year = document.getElementById('yearSelect').value;
-  const section = document.getElementById('sectionSelect').value;
-  const pSelect = document.getElementById('periodSelect');
-  const selectedPeriod = Number(pSelect.value);
-  const selectedOption = pSelect.options[pSelect.selectedIndex];
-  
-  // Format today's date to YYYY-MM-DD
-  const todayDate = new Date().toISOString().split('T')[0];
+    const sections = (year === 'III') 
+      ? ['A','B','C','D','E','F','G','H'] 
+      : ['A','B','C','D','E','F'];
 
-  statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Checking existing records...</div>';
-
-  try {
-    // 1. Fetch existing daily records for same Year, Section, and Date
-    const checkRes = await fetch(`${API_BASE_URL}/api/reports/daily?year=${year}&section=${section}&date=${todayDate}`);
-    const existingRecords = await checkRes.json();
-
-    // 2. Check if a record already exists for the selected Period
-    const isAlreadyPosted = existingRecords.some(record => Number(record.period) === selectedPeriod);
-
-    if (isAlreadyPosted) {
-      // Alert the user and STOP sending data to server
-      alert(`⚠️ Attendance for Year ${year}, Section ${section}, Period ${selectedPeriod} has ALREADY been posted today!`);
-      statusDiv.innerHTML = `<div class="alert">Submission Blocked: Attendance for Period ${selectedPeriod} was already recorded today.</div>`;
-      return; // Stop further execution
-    }
-
-    // 3. If NOT posted, proceed with sending data to server
-    statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Submitting attendance...</div>';
-
-    const payload = {
-      employeeId: loggedInEmpId,
-      facultyName: document.getElementById('facultyName').value,
-      subjectName: document.getElementById('subjectName').value,
-      year: year,
-      section: section,
-      period: selectedPeriod,
-      sessionType: selectedOption.getAttribute('data-session'),
-      absentRollNumbers: document.getElementById('absentRolls').value
-    };
-
-    const res = await fetch(`${API_BASE_URL}/api/attendance`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    sections.forEach(sec => {
+      sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
     });
-
-    const data = await res.json();
-    if (res.ok) {
-      statusDiv.innerHTML = `<div class="success">Attendance recorded successfully in MongoDB!</div>`;
-      document.getElementById('absentRolls').value = '';
-    } else {
-      statusDiv.innerHTML = `<div class="alert">Error: ${data.error || 'Failed to submit.'}</div>`;
-    }
-
-  } catch (err) {
-    statusDiv.innerHTML = `<div class="alert">Network error: ${err.message}</div>`;
   }
-});
+
+  // Submit Attendance (With Duplicate Check)
+  document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const statusDiv = document.getElementById('entryStatus');
+    statusDiv.innerHTML = '';
+
+    const year = document.getElementById('yearSelect').value;
+    const section = document.getElementById('sectionSelect').value;
+    const pSelect = document.getElementById('periodSelect');
+    const selectedPeriod = Number(pSelect.value);
+    const selectedOption = pSelect.options[pSelect.selectedIndex];
+    
+    const todayDate = new Date().toISOString().split('T')[0];
+
+    statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Checking existing records...</div>';
+
+    try {
+      // 1. Fetch existing daily records for same Year, Section, and Date
+      const checkRes = await fetch(`${API_BASE_URL}/api/reports/daily?year=${year}&section=${section}&date=${todayDate}`);
+      const existingRecords = await checkRes.json();
+
+      // 2. Prevent duplicate posting
+      const isAlreadyPosted = Array.isArray(existingRecords) && existingRecords.some(record => Number(record.period) === selectedPeriod);
+
+      if (isAlreadyPosted) {
+        alert(`⚠️ Attendance for Year ${year}, Section ${section}, Period ${selectedPeriod} has ALREADY been posted today!`);
+        statusDiv.innerHTML = `<div class="alert">Submission Blocked: Attendance for Period ${selectedPeriod} was already recorded today.</div>`;
+        return;
+      }
+
+      // 3. Post to backend
+      statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Submitting attendance...</div>';
+
+      const payload = {
+        employeeId: loggedInEmpId,
+        facultyName: document.getElementById('facultyName').value,
+        subjectName: document.getElementById('subjectName').value,
+        year: year,
+        section: section,
+        period: selectedPeriod,
+        sessionType: selectedOption.getAttribute('data-session'),
+        absentRollNumbers: document.getElementById('absentRolls').value
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        statusDiv.innerHTML = `<div class="success">Attendance recorded successfully in MongoDB!</div>`;
+        document.getElementById('absentRolls').value = '';
+      } else {
+        statusDiv.innerHTML = `<div class="alert">Error: ${data.error || 'Failed to submit.'}</div>`;
+      }
+
+    } catch (err) {
+      statusDiv.innerHTML = `<div class="alert">Network error: ${err.message}</div>`;
+    }
+  });
 
   // Tab Switcher
   function showTab(tabName) {
@@ -339,67 +337,71 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
 
   // Fetch Reports
   async function fetchClassReport() {
-  const yr = document.getElementById('rptYearSelect').value;
-  const sec = document.getElementById('rptSection').value;
-  const dt = document.getElementById('rptDate').value;
+    const yr = document.getElementById('rptYearSelect').value;
+    const sec = document.getElementById('rptSection').value;
+    const dt = document.getElementById('rptDate').value;
 
-  if (!sec || !dt) {
-    alert("Please enter Section and select a Date.");
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/reports/daily?year=${yr}&section=${sec}&date=${dt}`);
-    const records = await res.json();
-
-    if (!records || records.length === 0) {
-      document.getElementById('classReportResults').innerHTML = '<div class="alert">No attendance records found for the selected criteria.</div>';
+    if (!sec || !dt) {
+      alert("Please select Section and Date.");
       return;
     }
 
-    // Updated Table Headers including 'Employee ID'
-    let html = `
-      <table style="margin-top: 15px; width: 100%; border-collapse: collapse;">
-        <thead>
-          <tr style="background-color: #f2f2f2;">
-            <th>Period</th>
-            <th>Session</th>
-            <th>Subject</th>
-            <th>Employee ID</th>
-            <th>Faculty Name</th>
-            <th>Absent Roll Numbers</th>
-          </tr>
-        </thead>
-        <tbody>`;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports/daily?year=${yr}&section=${sec}&date=${dt}`);
+      const records = await res.json();
 
-    records.forEach(r => {
-      const absentees = r.absentRollNumbers && r.absentRollNumbers.length > 0 
-        ? r.absentRollNumbers.join(', ') 
-        : '<span style="color: green; font-weight: bold;">Nil</span>';
+      if (!records || records.length === 0) {
+        document.getElementById('classReportResults').innerHTML = '<div class="alert">No attendance records found for the selected criteria.</div>';
+        return;
+      }
 
-      html += `
-        <tr>
-          <td><strong>Period ${r.period}</strong></td>
-          <td>${r.sessionType || 'N/A'}</td>
-          <td>${r.subjectName || 'N/A'}</td>
-          <td><code>${r.employeeId || 'N/A'}</code></td>
-          <td>${r.facultyName || 'N/A'}</td>
-          <td>${absentees}</td>
-        </tr>`;
-    });
+      let html = `
+        <table>
+          <thead>
+            <tr>
+              <th>Period</th>
+              <th>Session</th>
+              <th>Subject</th>
+              <th>Employee ID</th>
+              <th>Faculty Name</th>
+              <th>Absent Roll Numbers</th>
+            </tr>
+          </thead>
+          <tbody>`;
 
-    html += '</tbody></table>';
-    document.getElementById('classReportResults').innerHTML = html;
+      records.forEach(r => {
+        const absentees = r.absentRollNumbers && r.absentRollNumbers.length > 0 
+          ? r.absentRollNumbers.join(', ') 
+          : '<span style="color: green; font-weight: bold;">Nil</span>';
 
-  } catch (err) {
-    document.getElementById('classReportResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
+        html += `
+          <tr>
+            <td><strong>Period ${r.period}</strong></td>
+            <td>${r.sessionType || 'N/A'}</td>
+            <td>${r.subjectName || 'N/A'}</td>
+            <td><code>${r.employeeId || 'N/A'}</code></td>
+            <td>${r.facultyName || 'N/A'}</td>
+            <td>${absentees}</td>
+          </tr>`;
+      });
+
+      html += '</tbody></table>';
+      document.getElementById('classReportResults').innerHTML = html;
+
+    } catch (err) {
+      document.getElementById('classReportResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
+    }
   }
-}
 
   async function fetchStudentReport() {
     const yr = document.getElementById('stuYearSelect').value;
     const sec = document.getElementById('stuSection').value;
     const roll = document.getElementById('stuRollNumber').value;
+
+    if (!roll) {
+      alert("Please enter Roll Number.");
+      return;
+    }
 
     const res = await fetch(`${API_BASE_URL}/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
     const data = await res.json();
@@ -413,7 +415,7 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
       </div>
       <h4>Absent Breakdown</h4>
       <table><tr><th>Date</th><th>Period</th><th>Session</th><th>Subject</th></tr>`;
-    data.absentDetails.forEach(d => {
+    (data.absentDetails || []).forEach(d => {
       html += `<tr><td>${d.date}</td><td>${d.period}</td><td>${d.sessionType}</td><td>${d.subject}</td></tr>`;
     });
     html += '</table>';
@@ -428,11 +430,11 @@ document.getElementById('attendanceForm').addEventListener('submit', async (e) =
     const list = await res.json();
 
     let html = `<table><tr><th>Roll Number</th><th>Status Flag</th></tr>`;
-    list.forEach(item => {
+    (list || []).forEach(item => {
       html += `<tr><td><strong>${item.rollNumber}</strong></td><td style="color:red;">${item.reason}</td></tr>`;
     });
     html += '</table>';
-    document.getElementById('absenteesResults').innerHTML = list.length ? html : '<div class="success">No frequent absentees found!</div>';
+    document.getElementById('absenteesResults').innerHTML = (list && list.length) ? html : '<div class="success">No frequent absentees found!</div>';
   }
 </script>
 
