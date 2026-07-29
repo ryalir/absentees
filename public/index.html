@@ -16,12 +16,12 @@
       min-height: 100vh; 
     }
     
-    /* Responsive Header & Banner */
+    /* Responsive Header Banner */
     header { 
       background: #ffffff; 
       width: 100%; 
       border-bottom: 2px solid #0056b3; 
-      padding: 8px 12px; 
+      padding: 6px 10px; 
       display: flex; 
       justify-content: center; 
       align-items: center; 
@@ -37,11 +37,11 @@
       display: block; 
     }
 
-    /* Adaptive Main Container */
+    /* Main Container */
     .container { 
       max-width: 950px; 
       width: 94%; 
-      margin: 15px auto; 
+      margin: 12px auto; 
       background: #fff; 
       padding: 20px; 
       border-radius: 8px; 
@@ -60,7 +60,7 @@
       border: 1px solid #ccc; 
       border-radius: 4px; 
       font-size: 14px; 
-      min-height: 42px; /* Touch-friendly height */
+      min-height: 42px;
     }
 
     button { 
@@ -73,13 +73,41 @@
       font-weight: bold; 
       width: 100%; 
       font-size: 15px; 
-      min-height: 44px; /* Touch target standard */
+      min-height: 44px;
       transition: background 0.2s ease;
     }
 
     button:hover { background-color: #2980b9; }
 
-    /* Responsive Grid Layouts for Inputs */
+    /* Dashboard Card Widget */
+    .dashboard-card {
+      background: #ffffff;
+      border-left: 5px solid #e74c3c;
+      padding: 16px;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .badge-count {
+      background: #e74c3c;
+      color: white;
+      font-weight: bold;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+    }
+
+    /* Grid Layouts */
     .form-row {
       display: flex;
       gap: 15px;
@@ -88,31 +116,31 @@
 
     .form-row .form-group {
       flex: 1;
-      min-width: 220px; /* Stacks automatically on small mobile screens */
+      min-width: 220px;
     }
 
-    /* Adaptive Navigation Tabs */
+    /* Navigation Tabs */
     .nav { 
       display: flex; 
       gap: 8px; 
       margin-bottom: 20px; 
       border-bottom: 2px solid #ddd; 
       padding-bottom: 10px; 
-      flex-wrap: wrap; /* Wraps cleanly on narrow screens */
+      flex-wrap: wrap; 
     }
 
     .nav button { 
       background: #ecf0f1; 
       color: #2c3e50; 
       width: auto; 
-      flex: 1 1 calc(50% - 8px); /* 2x2 grid on phones, 1 row on desktops */
-      font-size: 0.9rem;
+      flex: 1 1 calc(33.33% - 8px); 
+      font-size: 0.88rem;
       padding: 10px;
     }
 
     .nav button.active { background: #3498db; color: white; }
 
-    /* Controls Bar in Reports */
+    /* Report Controls Bar */
     .report-controls {
       display: flex;
       gap: 10px;
@@ -129,10 +157,10 @@
 
     .report-controls button {
       width: auto;
-      min-width: 120px;
+      min-width: 130px;
     }
 
-    /* Responsive Touch-Scrollable Table Container */
+    /* Scrollable Responsive Tables */
     .table-responsive {
       width: 100%;
       overflow-x: auto;
@@ -146,7 +174,7 @@
     th, td { border: 1px solid #ddd; padding: 10px 12px; text-align: left; font-size: 14px; }
     th { background: #f2f2f2; font-weight: 600; }
 
-    /* User Badge & Cards */
+    /* User Badge */
     .user-badge { 
       background: #e8f8f5; 
       border: 1px solid #a3e4d7; 
@@ -165,7 +193,7 @@
     .alert { padding: 12px; background-color: #f8d7da; color: #721c24; border-radius: 4px; margin-top: 10px; }
     .success { padding: 12px; background-color: #d4edda; color: #155724; border-radius: 4px; margin-top: 10px; }
 
-    /* Responsive Footer */
+    /* Footer */
     footer { 
       background-color: #1a252f; 
       color: #ecf0f1; 
@@ -189,30 +217,28 @@
     .footer-item strong { color: #3498db; }
     .divider { display: inline-block; }
 
-    /* MEDIA QUERIES FOR TABLETS & PHONES */
     @media (max-width: 768px) {
       .container { padding: 15px; width: 95%; margin: 10px auto; }
-      .nav button { flex: 1 1 100%; } /* Single full-width buttons on small phones */
+      .nav button { flex: 1 1 100%; }
       .report-controls select, .report-controls input, .report-controls button { width: 100%; flex: 100%; }
       .header-logo { max-height: 90px; }
-      .divider { display: none; } /* Hide vertical bar dividers on wrapped footer */
+      .divider { display: none; }
       .footer-item { flex: 1 1 100%; margin: 2px 0; }
     }
 
     @media (min-width: 769px) {
-      .nav button { flex: 1; } /* Desktop 1-row nav tab layout */
+      .nav button { flex: 1; }
     }
   </style>
 </head>
 <body>
 
-<!-- HEADER WITH WEBSITE LOGO BANNER -->
 <header>
   <img src="logo.png" alt="Daily Absentee Monitor" class="header-logo">
 </header>
 
 <div class="container">
-  <!-- LOGIN PAGE -->
+  <!-- LOGIN SECTION -->
   <div id="loginSection">
     <h2>Faculty Login</h2>
     <form id="loginForm">
@@ -231,15 +257,29 @@
       <button class="badge-btn" onclick="logout()">Logout</button>
     </div>
 
+    <!-- HOME SCREEN DASHBOARD WIDGET -->
+    <div id="dashboardWidget" class="dashboard-card">
+      <div class="dashboard-header">
+        <h3 style="margin:0; color:#2c3e50; font-size:1.1rem;">
+          🚨 Critical Alert: High Afternoon Absentees (≥ 6 Sessions)
+        </h3>
+        <span class="badge-count" id="totalFlaggedCount">Loading...</span>
+      </div>
+      <div id="dashboardSummaryContent">
+        <div style="color:#666; font-size:13px;">Analyzing attendance patterns across classes...</div>
+      </div>
+    </div>
+
     <!-- NAVIGATION TABS -->
     <div class="nav">
       <button id="tabEntry" class="active" onclick="showTab('entry')">Mark Attendance</button>
       <button id="tabClass" onclick="showTab('class')">Class Daily Report</button>
       <button id="tabStudent" onclick="showTab('student')">Student Consolidated</button>
       <button id="tabAbsentees" onclick="showTab('absentees')">Frequent Absentees</button>
+      <button id="tabPartDay" onclick="showTab('partDay')">Morning Present / Afternoon Absent</button>
     </div>
 
-    <!-- TAB 1: ATTENDANCE ENTRY FORM -->
+    <!-- TAB 1: MARK ATTENDANCE -->
     <div id="viewEntry">
       <h2>Enter Attendance Details</h2>
       <form id="attendanceForm">
@@ -291,7 +331,7 @@
       <div id="entryStatus"></div>
     </div>
 
-    <!-- TAB 2: CLASS REPORT -->
+    <!-- TAB 2: CLASS DAILY REPORT -->
     <div id="viewClass" class="hidden">
       <h2>Class Daily Report</h2>
       <div class="report-controls">
@@ -336,10 +376,25 @@
       <div id="absenteesResults"></div>
     </div>
 
+    <!-- TAB 5: MORNING PRESENT / AFTERNOON ABSENT -->
+    <div id="viewPartDay" class="hidden">
+      <h2>Morning Present & Afternoon Absent Report</h2>
+      <p style="font-size:13px; color:#666; margin-bottom: 12px;">(Lists students who attended all morning periods but were absent in the afternoon)</p>
+      <div class="report-controls">
+        <select id="partYearSelect" onchange="updateSectionsOnly('partYearSelect', 'partSection')">
+          <option value="III">III Year</option>
+          <option value="IV">IV Year</option>
+        </select>
+        <select id="partSection"></select>
+        <input type="date" id="partDate">
+        <button onclick="fetchPartDayReport()">Generate Report</button>
+      </div>
+      <div id="partDayResults"></div>
+    </div>
+
   </div>
 </div>
 
-<!-- FOOTER SECTION -->
 <footer>
   <div class="footer-content">
     <div class="footer-item"><strong>Developed By :</strong> Mr. R.S.V.V. PRASAD RAO</div>
@@ -358,7 +413,7 @@
   let loggedInEmpId = '';
   const API_BASE_URL = window.location.origin;
 
-  // Login handler
+  // Handle Login
   document.getElementById('loginForm').addEventListener('submit', (e) => {
     e.preventDefault();
     loggedInEmpId = document.getElementById('employeeIdInput').value.trim();
@@ -368,9 +423,14 @@
       document.getElementById('appSection').classList.remove('hidden');
       updateDateTime();
       
+      // Initialize dropdown options
       updateSectionsOnly('rptYearSelect', 'rptSection');
       updateSectionsOnly('stuYearSelect', 'stuSection');
       updateSectionsOnly('absYearSelect', 'absSection');
+      updateSectionsOnly('partYearSelect', 'partSection');
+
+      // Auto-load Home Screen Dashboard
+      loadDashboardSummary();
     }
   });
 
@@ -384,6 +444,7 @@
     document.getElementById('autoDateTime').value = new Date().toLocaleString();
   }
 
+  // Attendance Form Dynamic Dropdowns
   function updateOptions(yearElemId, secElemId, periodElemId) {
     const year = document.getElementById(yearElemId).value;
     const sectionSelect = document.getElementById(secElemId);
@@ -407,6 +468,7 @@
     }
   }
 
+  // Report Section Dropdowns
   function updateSectionsOnly(yearElemId, secElemId) {
     const year = document.getElementById(yearElemId).value;
     const sectionSelect = document.getElementById(secElemId);
@@ -418,7 +480,65 @@
     });
   }
 
-  // Submit Attendance
+  // Load Home Screen Dashboard Summary
+  async function loadDashboardSummary() {
+    const container = document.getElementById('dashboardSummaryContent');
+    const countBadge = document.getElementById('totalFlaggedCount');
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/dashboard/frequent-afternoon-absentees`);
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        container.innerHTML = '<div style="color:#721c24;">Failed to load dashboard summary.</div>';
+        countBadge.innerText = '0';
+        return;
+      }
+
+      countBadge.innerText = `${data.totalCount} Student(s)`;
+
+      if (data.totalCount === 0) {
+        container.innerHTML = '<div style="color:#27ae60; font-weight:bold; font-size:14px;">✓ No students have reached 6 or more afternoon absentee sessions across any section!</div>';
+        return;
+      }
+
+      let html = '';
+      Object.keys(data.groupedData).forEach(classGroup => {
+        html += `
+          <div style="margin-top:10px;">
+            <strong style="color:#2c3e50; font-size:14px;">📍 ${classGroup} (${data.groupedData[classGroup].length} Students):</strong>
+            <div class="table-responsive" style="margin-top:6px; margin-bottom:12px;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Roll Number</th>
+                    <th>Flagged Sessions (Morning Present & Afternoon Absent)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>`;
+
+        data.groupedData[classGroup].forEach(student => {
+          html += `
+            <tr>
+              <td><strong>${student.rollNumber}</strong></td>
+              <td><span style="color:#c53030; font-weight:bold;">${student.flaggedSessionsCount} Sessions</span></td>
+              <td><span style="background:#fff5f5; color:#c53030; padding:2px 8px; border-radius:4px; font-weight:600; font-size:12px;">Action Required</span></td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div></div>';
+      });
+
+      container.innerHTML = html;
+
+    } catch (err) {
+      container.innerHTML = `<div style="color:#721c24;">Error connecting to backend: ${err.message}</div>`;
+      countBadge.innerText = 'Error';
+    }
+  }
+
+  // Submit Attendance (With Duplicate Check)
   document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const statusDiv = document.getElementById('entryStatus');
@@ -469,6 +589,7 @@
       if (res.ok) {
         statusDiv.innerHTML = `<div class="success">Attendance recorded successfully in MongoDB!</div>`;
         document.getElementById('absentRolls').value = '';
+        loadDashboardSummary(); // Refresh dashboard data after submitting
       } else {
         statusDiv.innerHTML = `<div class="alert">Error: ${data.error || 'Failed to submit.'}</div>`;
       }
@@ -480,7 +601,7 @@
 
   // Tab Switcher
   function showTab(tabName) {
-    ['entry', 'class', 'student', 'absentees'].forEach(t => {
+    ['entry', 'class', 'student', 'absentees', 'partDay'].forEach(t => {
       document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
       document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.remove('active');
     });
@@ -488,7 +609,7 @@
     document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
   }
 
-  // Reports API Fetching
+  // 1. Class Report
   async function fetchClassReport() {
     const yr = document.getElementById('rptYearSelect').value;
     const sec = document.getElementById('rptSection').value;
@@ -547,79 +668,79 @@
     }
   }
 
-async function fetchStudentReport() {
-  const yr = document.getElementById('stuYearSelect').value;
-  const sec = document.getElementById('stuSection').value;
-  const roll = document.getElementById('stuRollNumber').value.trim();
+  // 2. Student Consolidated Report
+  async function fetchStudentReport() {
+    const yr = document.getElementById('stuYearSelect').value;
+    const sec = document.getElementById('stuSection').value;
+    const roll = document.getElementById('stuRollNumber').value.trim();
 
-  if (!roll) {
-    alert("Please enter Roll Number.");
-    return;
-  }
-
-  const resultsDiv = document.getElementById('studentReportResults');
-  resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Searching student records...</div>';
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
-    const data = await res.json();
-
-    // Check if backend returned an error response (e.g. invalid roll or missing section records)
-    if (!res.ok || data.error) {
-      resultsDiv.innerHTML = `<div class="alert">⚠️ ${data.error || 'No records found for the specified Roll Number in this Year & Section combination.'}</div>`;
+    if (!roll) {
+      alert("Please enter Roll Number.");
       return;
     }
 
-    // Consolidated Summary Display
-    let html = `
-      <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:6px; border:1px solid #e2e8f0;">
-        <p style="margin: 5px 0;"><strong>Roll Number:</strong> ${data.rollNumber}</p>
-        <p style="margin: 5px 0;"><strong>Class / Section:</strong> ${data.year} Year - Section ${data.section}</p>
-        <p style="margin: 5px 0;"><strong>Total Recorded Days (Sessions):</strong> ${data.totalSessions}</p>
-        <p style="margin: 5px 0;"><strong>Present Days:</strong> ${data.totalPresentSessions} (${data.presentPercentage})</p>
-        <p style="margin: 5px 0; color: #c53030;"><strong>Absent Days (Sessions):</strong> ${data.totalAbsentSessions} (${data.absentPercentage})</p>
-      </div>
+    const resultsDiv = document.getElementById('studentReportResults');
+    resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Searching student records...</div>';
 
-      <h4 style="margin-top: 20px; color: #2c3e50;">Absent Breakdown by Date</h4>`;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
+      const data = await res.json();
 
-    if (!data.absentBreakdown || data.absentBreakdown.length === 0) {
-      html += '<div class="success">No absences recorded for Roll Number ' + data.rollNumber + '! 100% Attendance recorded.</div>';
-    } else {
-      html += `
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Absent Periods (Ascending)</th>
-                <th>Total Periods Missed</th>
-                <th>Session Contribution</th>
-              </tr>
-            </thead>
-            <tbody>`;
+      if (!res.ok || data.error) {
+        resultsDiv.innerHTML = `<div class="alert">⚠️ ${data.error || 'No records found for the specified Roll Number in this Year & Section combination.'}</div>`;
+        return;
+      }
 
-      data.absentBreakdown.forEach(item => {
-        const formattedPeriods = item.periods.map(p => `Period ${p}`).join(', ');
+      let html = `
+        <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:6px; border:1px solid #e2e8f0;">
+          <p style="margin: 5px 0;"><strong>Roll Number:</strong> ${data.rollNumber}</p>
+          <p style="margin: 5px 0;"><strong>Class / Section:</strong> ${data.year} Year - Section ${data.section}</p>
+          <p style="margin: 5px 0;"><strong>Total Recorded Days (Sessions):</strong> ${data.totalSessions}</p>
+          <p style="margin: 5px 0;"><strong>Present Days:</strong> ${data.totalPresentSessions} (${data.presentPercentage})</p>
+          <p style="margin: 5px 0; color: #c53030;"><strong>Absent Days (Sessions):</strong> ${data.totalAbsentSessions} (${data.absentPercentage})</p>
+        </div>
 
+        <h4 style="margin-top: 20px; color: #2c3e50;">Absent Breakdown by Date</h4>`;
+
+      if (!data.absentBreakdown || data.absentBreakdown.length === 0) {
+        html += `<div class="success">No absences recorded for Roll Number ${data.rollNumber}! 100% Attendance recorded.</div>`;
+      } else {
         html += `
-          <tr>
-            <td><strong>${item.date}</strong></td>
-            <td><span style="color:#e53e3e; font-weight:600;">${formattedPeriods}</span></td>
-            <td>${item.periodCount} Period(s)</td>
-            <td><strong>1 Session</strong></td>
-          </tr>`;
-      });
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Absent Periods (Ascending)</th>
+                  <th>Total Periods Missed</th>
+                  <th>Session Contribution</th>
+                </tr>
+              </thead>
+              <tbody>`;
 
-      html += '</tbody></table></div>';
+        data.absentBreakdown.forEach(item => {
+          const formattedPeriods = item.periods.map(p => `Period ${p}`).join(', ');
+
+          html += `
+            <tr>
+              <td><strong>${item.date}</strong></td>
+              <td><span style="color:#e53e3e; font-weight:600;">${formattedPeriods}</span></td>
+              <td>${item.periodCount} Period(s)</td>
+              <td><strong>1 Session</strong></td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+      }
+
+      resultsDiv.innerHTML = html;
+
+    } catch (err) {
+      resultsDiv.innerHTML = `<div class="alert">Network Error: ${err.message}</div>`;
     }
-
-    resultsDiv.innerHTML = html;
-
-  } catch (err) {
-    resultsDiv.innerHTML = `<div class="alert">Network Error: ${err.message}</div>`;
   }
-}
 
+  // 3. Frequent Absentees Report
   async function fetchFrequentAbsentees() {
     const yr = document.getElementById('absYearSelect').value;
     const sec = document.getElementById('absSection').value;
@@ -647,6 +768,70 @@ async function fetchStudentReport() {
       document.getElementById('absenteesResults').innerHTML = (list && list.length) ? html : '<div class="success">No frequent absentees found!</div>';
     } catch (err) {
       document.getElementById('absenteesResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
+    }
+  }
+
+  // 4. Morning Present / Afternoon Absent Report
+  async function fetchPartDayReport() {
+    const yr = document.getElementById('partYearSelect').value;
+    const sec = document.getElementById('partSection').value;
+    const dt = document.getElementById('partDate').value;
+
+    if (!sec || !dt) {
+      alert("Please select Section and Date.");
+      return;
+    }
+
+    const resultsDiv = document.getElementById('partDayResults');
+    resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Analyzing attendance records...</div>';
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports/morning-present-afternoon-absent?year=${yr}&section=${sec}&date=${dt}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        resultsDiv.innerHTML = `<div class="alert">⚠️ ${data.error || 'Failed to fetch report.'}</div>`;
+        return;
+      }
+
+      if (data.message) {
+        resultsDiv.innerHTML = `<div class="alert">${data.message}</div>`;
+        return;
+      }
+
+      if (!data.students || data.students.length === 0) {
+        resultsDiv.innerHTML = '<div class="success">No students found who were present in the morning but absent in the afternoon on this date!</div>';
+        return;
+      }
+
+      let html = `
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Roll Number</th>
+                <th>Morning Status</th>
+                <th>Afternoon Missed Periods</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      data.students.forEach(item => {
+        const formattedPeriods = item.missedAfternoonPeriods.map(p => `Period ${p}`).join(', ');
+
+        html += `
+          <tr>
+            <td><strong>${item.rollNumber}</strong></td>
+            <td><span style="color: green; font-weight: bold;">Present (0 Absences)</span></td>
+            <td><span style="color: #c53030; font-weight: bold;">${formattedPeriods}</span></td>
+          </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      resultsDiv.innerHTML = html;
+
+    } catch (err) {
+      resultsDiv.innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
     }
   }
 </script>
