@@ -393,34 +393,76 @@
     }
   }
 
-  async function fetchStudentReport() {
-    const yr = document.getElementById('stuYearSelect').value;
-    const sec = document.getElementById('stuSection').value;
-    const roll = document.getElementById('stuRollNumber').value;
+async function fetchStudentReport() {
+  const yr = document.getElementById('stuYearSelect').value;
+  const sec = document.getElementById('stuSection').value;
+  const roll = document.getElementById('stuRollNumber').value.trim();
 
-    if (!roll) {
-      alert("Please enter Roll Number.");
-      return;
-    }
+  if (!roll) {
+    alert("Please enter Roll Number.");
+    return;
+  }
 
+  const resultsDiv = document.getElementById('studentReportResults');
+  resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Searching student records...</div>';
+
+  try {
     const res = await fetch(`${API_BASE_URL}/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
     const data = await res.json();
 
+    if (!res.ok) {
+      resultsDiv.innerHTML = `<div class="alert">${data.error || 'Failed to fetch report.'}</div>`;
+      return;
+    }
+
+    // Consolidated Summary Display
     let html = `
-      <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:4px;">
-        <p><strong>Roll Number:</strong> ${data.rollNumber}</p>
-        <p><strong>Total Sessions:</strong> ${data.totalSessions}</p>
-        <p><strong>Present Days:</strong> ${data.totalPresent} (${data.presentPercentage})</p>
-        <p><strong>Absent Days:</strong> ${data.totalAbsent} (${data.absentPercentage})</p>
+      <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:6px; border:1px solid #e2e8f0;">
+        <p style="margin: 5px 0;"><strong>Roll Number:</strong> ${data.rollNumber}</p>
+        <p style="margin: 5px 0;"><strong>Total Recorded Days (Sessions):</strong> ${data.totalSessions}</p>
+        <p style="margin: 5px 0;"><strong>Present Days:</strong> ${data.totalPresentSessions} (${data.presentPercentage})</p>
+        <p style="margin: 5px 0; color: #c53030;"><strong>Absent Days (Sessions):</strong> ${data.totalAbsentSessions} (${data.absentPercentage})</p>
       </div>
-      <h4>Absent Breakdown</h4>
-      <table><tr><th>Date</th><th>Period</th><th>Session</th><th>Subject</th></tr>`;
-    (data.absentDetails || []).forEach(d => {
-      html += `<tr><td>${d.date}</td><td>${d.period}</td><td>${d.sessionType}</td><td>${d.subject}</td></tr>`;
-    });
-    html += '</table>';
-    document.getElementById('studentReportResults').innerHTML = html;
+
+      <h4 style="margin-top: 20px; color: #2c3e50;">Absent Breakdown by Date</h4>`;
+
+    if (!data.absentBreakdown || data.absentBreakdown.length === 0) {
+      html += '<div class="success">No absences recorded! 100% Attendance.</div>';
+    } else {
+      html += `
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Absent Periods (Ascending)</th>
+              <th>Total Periods Missed on Date</th>
+              <th>Session Count Contribution</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+      data.absentBreakdown.forEach(item => {
+        // Display periods formatted like: "Period 1, Period 4, Period 5"
+        const formattedPeriods = item.periods.map(p => `Period ${p}`).join(', ');
+
+        html += `
+          <tr>
+            <td><strong>${item.date}</strong></td>
+            <td><span style="color:#e53e3e; font-weight:600;">${formattedPeriods}</span></td>
+            <td>${item.periodCount} Period(s)</td>
+            <td><strong>1 Session</strong></td>
+          </tr>`;
+      });
+
+      html += '</tbody></table>';
+    }
+
+    resultsDiv.innerHTML = html;
+
+  } catch (err) {
+    resultsDiv.innerHTML = `<div class="alert">Network Error: ${err.message}</div>`;
   }
+}
 
   async function fetchFrequentAbsentees() {
     const yr = document.getElementById('absYearSelect').value;
