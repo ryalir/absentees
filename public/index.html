@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Attendance Portal</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f4f7f6; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h2 { color: #2c3e50; margin-top: 0; }
+    .hidden { display: none !important; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: 600; color: #34495e; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    button { background-color: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 15px; }
+    button:hover { background-color: #2980b9; }
+    
+    /* Navigation Tabs */
+    .nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+    .nav button { background: #ecf0f1; color: #2c3e50; width: auto; flex: 1; }
+    .nav button.active { background: #3498db; color: white; }
+    
+    /* Display Cards */
+    .user-badge { background: #e8f8f5; border: 1px solid #a3e4d7; color: #117a65; padding: 10px; border-radius: 4px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+    .badge-btn { width: auto; padding: 5px 10px; background: #e74c3c; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+    th { background: #f2f2f2; }
+    .alert { padding: 12px; background-color: #f8d7da; color: #721c24; border-radius: 4px; margin-top: 10px; }
+    .success { padding: 12px; background-color: #d4edda; color: #155724; border-radius: 4px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- LOGIN PAGE -->
+  <div id="loginSection">
+    <h2>Faculty Login</h2>
+    <form id="loginForm">
+      <div class="form-group">
+        <label>Employee ID:</label>
+        <input type="text" id="employeeIdInput" placeholder="Enter Employee ID (e.g. EMP101)" required>
+      </div>
+      <button type="submit">Submit & Login</button>
+    </form>
+  </div>
+
+  <!-- MAIN APP INTERFACE -->
+  <div id="appSection" class="hidden">
+    <div class="user-badge">
+      <span>Logged in as Employee ID: <strong id="loggedEmpId"></strong></span>
+      <button class="badge-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <!-- SIMPLE NAVIGATION -->
+    <div class="nav">
+      <button id="tabEntry" class="active" onclick="showTab('entry')">Mark Attendance</button>
+      <button id="tabClass" onclick="showTab('class')">Class Daily Report</button>
+      <button id="tabStudent" onclick="showTab('student')">Student Consolidated</button>
+      <button id="tabAbsentees" onclick="showTab('absentees')">Frequent Absentees</button>
+    </div>
+
+    <!-- TAB 1: ATTENDANCE ENTRY FORM -->
+    <div id="viewEntry">
+      <h2>Enter Attendance Details</h2>
+      <form id="attendanceForm">
+        <div class="form-group">
+          <label>Recorded Date & Time (Auto):</label>
+          <input type="text" id="autoDateTime" readonly disabled style="background:#e9ecef;">
+        </div>
+        
+        <div style="display: flex; gap: 15px;">
+          <div class="form-group" style="flex:1;">
+            <label>Year:</label>
+            <select id="yearSelect" onchange="updateOptions()" required>
+              <option value="">Select Year</option>
+              <option value="III">III Year</option>
+              <option value="IV">IV Year</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Section:</label>
+            <select id="sectionSelect" required></select>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 15px;">
+          <div class="form-group" style="flex:1;">
+            <label>Faculty Name:</label>
+            <input type="text" id="facultyName" placeholder="Enter Faculty Name" required>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Subject Name:</label>
+            <input type="text" id="subjectName" placeholder="Enter Subject" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Period & Session:</label>
+          <select id="periodSelect" required></select>
+        </div>
+
+        <div class="form-group">
+          <label>Absent Student Roll Numbers (Comma Separated):</label>
+          <textarea id="absentRolls" rows="3" placeholder="e.g. 101, 102, 105"></textarea>
+        </div>
+
+        <button type="submit">Submit Attendance</button>
+      </form>
+      <div id="entryStatus"></div>
+    </div>
+
+    <!-- TAB 2: OVERALL CLASS REPORT -->
+    <div id="viewClass" class="hidden">
+      <h2>Class Daily Report</h2>
+      <div style="display:flex; gap:10px;">
+        <select id="rptYearSelect"><option value="III">III Year</option><option value="IV">IV Year</option></select>
+        <input type="text" id="rptSection" placeholder="Section (e.g. A)">
+        <input type="date" id="rptDate">
+        <button style="width: auto;" onclick="fetchClassReport()">Generate</button>
+      </div>
+      <div id="classReportResults"></div>
+    </div>
+
+    <!-- TAB 3: STUDENT CONSOLIDATED REPORT -->
+    <div id="viewStudent" class="hidden">
+      <h2>Student Consolidated Report</h2>
+      <div style="display:flex; gap:10px;">
+        <select id="stuYearSelect"><option value="III">III Year</option><option value="IV">IV Year</option></select>
+        <input type="text" id="stuSection" placeholder="Section (e.g. A)">
+        <input type="text" id="stuRollNumber" placeholder="Roll Number (e.g. 101)">
+        <button style="width: auto;" onclick="fetchStudentReport()">Search</button>
+      </div>
+      <div id="studentReportResults"></div>
+    </div>
+
+    <!-- TAB 4: FREQUENT ABSENTEES REPORT -->
+    <div id="viewAbsentees" class="hidden">
+      <h2>Frequent Absentees Report</h2>
+      <p style="font-size:13px; color:#666;">(Students absent for 3 consecutive days in Morning, Afternoon, or Full Day)</p>
+      <div style="display:flex; gap:10px;">
+        <select id="absYearSelect"><option value="III">III Year</option><option value="IV">IV Year</option></select>
+        <input type="text" id="absSection" placeholder="Section (e.g. A)">
+        <button style="width: auto;" onclick="fetchFrequentAbsentees()">Identify</button>
+      </div>
+      <div id="absenteesResults"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let loggedInEmpId = '';
+
+  // Handle Login
+  document.getElementById('loginForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    loggedInEmpId = document.getElementById('employeeIdInput').value.trim();
+    if(loggedInEmpId) {
+      document.getElementById('loggedEmpId').innerText = loggedInEmpId;
+      document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('appSection').classList.remove('hidden');
+      updateDateTime();
+    }
+  });
+
+  function logout() {
+    loggedInEmpId = '';
+    document.getElementById('loginSection').classList.remove('hidden');
+    document.getElementById('appSection').classList.add('hidden');
+  }
+
+  function updateDateTime() {
+    document.getElementById('autoDateTime').value = new Date().toLocaleString();
+  }
+
+  // Dynamic Options Rule Setup
+  function updateOptions() {
+    const year = document.getElementById('yearSelect').value;
+    const sectionSelect = document.getElementById('sectionSelect');
+    const periodSelect = document.getElementById('periodSelect');
+
+    sectionSelect.innerHTML = '';
+    periodSelect.innerHTML = '';
+
+    if (year === 'III') {
+      // Sections A to H
+      ['A','B','C','D','E','F','G','H'].forEach(sec => {
+        sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
+      });
+      // Periods: 1-4 Morning, 5-7 Afternoon
+      [1,2,3,4].forEach(p => periodSelect.innerHTML += `<option value="${p}" data-session="Morning">Period ${p} (Morning Session)</option>`);
+      [5,6,7].forEach(p => periodSelect.innerHTML += `<option value="${p}" data-session="Afternoon">Period ${p} (Afternoon Session)</option>`);
+    } else if (year === 'IV') {
+      // Sections A to F
+      ['A','B','C','D','E','F'].forEach(sec => {
+        sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
+      });
+      // Periods: 1-3 Morning, 4-7 Afternoon
+      [1,2,3].forEach(p => periodSelect.innerHTML += `<option value="${p}" data-session="Morning">Period ${p} (Morning Session)</option>`);
+      [4,5,6,7].forEach(p => periodSelect.innerHTML += `<option value="${p}" data-session="Afternoon">Period ${p} (Afternoon Session)</option>`);
+    }
+  }
+
+  // Submit Attendance
+  document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pSelect = document.getElementById('periodSelect');
+    const selectedOption = pSelect.options[pSelect.selectedIndex];
+
+    const payload = {
+      employeeId: loggedInEmpId,
+      facultyName: document.getElementById('facultyName').value,
+      subjectName: document.getElementById('subjectName').value,
+      year: document.getElementById('yearSelect').value,
+      section: document.getElementById('sectionSelect').value,
+      period: pSelect.value,
+      sessionType: selectedOption.getAttribute('data-session'),
+      absentRollNumbers: document.getElementById('absentRolls').value
+    };
+
+    const res = await fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    const statusDiv = document.getElementById('entryStatus');
+    if (res.ok) {
+      statusDiv.innerHTML = `<div class="success">Attendance Recorded Successfully!</div>`;
+      document.getElementById('absentRolls').value = '';
+    } else {
+      statusDiv.innerHTML = `<div class="alert">Error: ${data.error}</div>`;
+    }
+  });
+
+  // Simple Navigation
+  function showTab(tabName) {
+    ['entry', 'class', 'student', 'absentees'].forEach(t => {
+      document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
+      document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.remove('active');
+    });
+    document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.remove('hidden');
+    document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
+  }
+
+  // Fetch Class Daily Report
+  async function fetchClassReport() {
+    const yr = document.getElementById('rptYearSelect').value;
+    const sec = document.getElementById('rptSection').value;
+    const dt = document.getElementById('rptDate').value;
+
+    const res = await fetch(`/api/reports/daily?year=${yr}&section=${sec}&date=${dt}`);
+    const records = await res.json();
+    let html = `<table><tr><th>Period</th><th>Session</th><th>Subject</th><th>Faculty</th><th>Absentees</th></tr>`;
+    records.forEach(r => {
+      html += `<tr><td>${r.period}</td><td>${r.sessionType}</td><td>${r.subjectName}</td><td>${r.facultyName}</td><td>${r.absentRollNumbers.join(', ') || 'Nil'}</td></tr>`;
+    });
+    html += '</table>';
+    document.getElementById('classReportResults').innerHTML = records.length ? html : '<div class="alert">No records found.</div>';
+  }
+
+  // Fetch Student Consolidated Report
+  async function fetchStudentReport() {
+    const yr = document.getElementById('stuYearSelect').value;
+    const sec = document.getElementById('stuSection').value;
+    const roll = document.getElementById('stuRollNumber').value;
+
+    const res = await fetch(`/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
+    const data = await res.json();
+
+    let html = `
+      <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:4px;">
+        <p><strong>Roll Number:</strong> ${data.rollNumber}</p>
+        <p><strong>Total Sessions:</strong> ${data.totalSessions}</p>
+        <p><strong>Present Days:</strong> ${data.totalPresent} (${data.presentPercentage})</p>
+        <p><strong>Absent Days:</strong> ${data.totalAbsent} (${data.absentPercentage})</p>
+      </div>
+      <h4>Absent Breakdown</h4>
+      <table><tr><th>Date</th><th>Period</th><th>Session</th><th>Subject</th></tr>`;
+    data.absentDetails.forEach(d => {
+      html += `<tr><td>${d.date}</td><td>${d.period}</td><td>${d.sessionType}</td><td>${d.subject}</td></tr>`;
+    });
+    html += '</table>';
+    document.getElementById('studentReportResults').innerHTML = html;
+  }
+
+  // Fetch Frequent Absentees Report
+  async function fetchFrequentAbsentees() {
+    const yr = document.getElementById('absYearSelect').value;
+    const sec = document.getElementById('absSection').value;
+
+    const res = await fetch(`/api/reports/frequent-absentees?year=${yr}&section=${sec}`);
+    const list = await res.json();
+
+    let html = `<table><tr><th>Roll Number</th><th>Status Flag</th></tr>`;
+    list.forEach(item => {
+      html += `<tr><td><strong>${item.rollNumber}</strong></td><td style="color:red;">${item.reason}</td></tr>`;
+    });
+    html += '</table>';
+    document.getElementById('absenteesResults').innerHTML = list.length ? html : '<div class="success">No frequent absentees found!</div>';
+  }
+</script>
+
+</body>
+</html>
