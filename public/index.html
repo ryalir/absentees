@@ -63,6 +63,37 @@
       min-height: 42px;
     }
 
+    /* Checkbox Group Styles */
+    .checkbox-group {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      background: #fff;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #2c3e50;
+    }
+
+    .checkbox-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      min-height: 18px;
+      cursor: pointer;
+    }
+
     button { 
       background-color: #3498db; 
       color: white; 
@@ -291,7 +322,7 @@
         <div class="form-row">
           <div class="form-group">
             <label>Year:</label>
-            <select id="yearSelect" onchange="updateOptions('yearSelect', 'sectionSelect', 'periodSelect')" required>
+            <select id="yearSelect" onchange="updateOptions('yearSelect', 'sectionSelect', 'periodCheckboxGroup')" required>
               <option value="">Select Year</option>
               <option value="III">III Year</option>
               <option value="IV">IV Year</option>
@@ -316,9 +347,12 @@
           </div>
         </div>
 
+        <!-- MULTI-SELECT PERIODS FIELD -->
         <div class="form-group">
-          <label>Period & Session:</label>
-          <select id="periodSelect" required></select>
+          <label>Select Periods & Sessions (Multiple Allowed):</label>
+          <div id="periodCheckboxGroup" class="checkbox-group">
+            <div style="color: #888; font-size: 13px;">Please select Year first to load periods.</div>
+          </div>
         </div>
 
         <div class="form-group">
@@ -444,28 +478,51 @@
     document.getElementById('autoDateTime').value = new Date().toLocaleString();
   }
 
-  // Attendance Form Dynamic Dropdowns
-  function updateOptions(yearElemId, secElemId, periodElemId) {
+  // Attendance Form Dynamic Dropdowns & Checkboxes
+  function updateOptions(yearElemId, secElemId, periodContainerId) {
     const year = document.getElementById(yearElemId).value;
     const sectionSelect = document.getElementById(secElemId);
-    const periodSelect = document.getElementById(periodElemId);
+    const periodContainer = document.getElementById(periodContainerId);
 
     sectionSelect.innerHTML = '';
-    periodSelect.innerHTML = '';
+    periodContainer.innerHTML = '';
+
+    let morningPeriods = [];
+    let afternoonPeriods = [];
 
     if (year === 'III') {
       ['A','B','C','D','E','F','G','H'].forEach(sec => {
         sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
       });
-      [1,2,3,4].forEach(p => periodSelect.innerHTML += `<option value="${p}" data-session="Morning">Period ${p} (Morning Session)</option>`);
-      [5,6,7].forEach(p => periodSelect.innerHTML += `<option value="${p}" data-session="Afternoon">Period ${p} (Afternoon Session)</option>`);
+      morningPeriods = [1, 2, 3, 4];
+      afternoonPeriods = [5, 6, 7];
     } else if (year === 'IV') {
       ['A','B','C','D','E','F'].forEach(sec => {
         sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
       });
-      [1,2,3].forEach(p => periodSelect.innerHTML += `<option value="${p}" data-session="Morning">Period ${p} (Morning Session)</option>`);
-      [4,5,6,7].forEach(p => periodSelect.innerHTML += `<option value="${p}" data-session="Afternoon">Period ${p} (Afternoon Session)</option>`);
+      morningPeriods = [1, 2, 3];
+      afternoonPeriods = [4, 5, 6, 7];
+    } else {
+      periodContainer.innerHTML = '<div style="color: #888; font-size: 13px;">Please select Year first to load periods.</div>';
+      return;
     }
+
+    // Render Checkboxes
+    morningPeriods.forEach(p => {
+      periodContainer.innerHTML += `
+        <label class="checkbox-item">
+          <input type="checkbox" name="periodSelect" value="${p}" data-session="Morning">
+          Period ${p} (Morning Session)
+        </label>`;
+    });
+
+    afternoonPeriods.forEach(p => {
+      periodContainer.innerHTML += `
+        <label class="checkbox-item">
+          <input type="checkbox" name="periodSelect" value="${p}" data-session="Afternoon">
+          Period ${p} (Afternoon Session)
+        </label>`;
+    });
   }
 
   // Report Section Dropdowns
@@ -538,7 +595,7 @@
     }
   }
 
-  // Submit Attendance (With Duplicate Check)
+  // Submit Attendance (Multi-Period Support with Duplicate Check)
   document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const statusDiv = document.getElementById('entryStatus');
@@ -546,52 +603,72 @@
 
     const year = document.getElementById('yearSelect').value;
     const section = document.getElementById('sectionSelect').value;
-    const pSelect = document.getElementById('periodSelect');
-    const selectedPeriod = Number(pSelect.value);
-    const selectedOption = pSelect.options[pSelect.selectedIndex];
     
-    const todayDate = new Date().toISOString().split('T')[0];
+    // Get all checked period checkboxes
+    const checkedBoxes = Array.from(document.querySelectorAll('input[name="periodSelect"]:checked'));
 
+    if (checkedBoxes.length === 0) {
+      alert("⚠️ Please select at least one period before submitting.");
+      return;
+    }
+
+    const todayDate = new Date().toISOString().split('T')[0];
     statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Checking existing records...</div>';
 
     try {
       const checkRes = await fetch(`${API_BASE_URL}/api/reports/daily?year=${year}&section=${section}&date=${todayDate}`);
       const existingRecords = await checkRes.json();
 
-      const isAlreadyPosted = Array.isArray(existingRecords) && existingRecords.some(record => Number(record.period) === selectedPeriod);
+      const selectedPeriods = checkedBoxes.map(cb => Number(cb.value));
 
-      if (isAlreadyPosted) {
-        alert(`⚠️ Attendance for Year ${year}, Section ${section}, Period ${selectedPeriod} has ALREADY been posted today!`);
-        statusDiv.innerHTML = `<div class="alert">Submission Blocked: Attendance for Period ${selectedPeriod} was already recorded today.</div>`;
+      // Filter out periods that were already posted today
+      const alreadyPostedPeriods = [];
+      if (Array.isArray(existingRecords)) {
+        existingRecords.forEach(record => {
+          if (selectedPeriods.includes(Number(record.period))) {
+            alreadyPostedPeriods.push(record.period);
+          }
+        });
+      }
+
+      if (alreadyPostedPeriods.length > 0) {
+        alert(`⚠️ Attendance for Year ${year}, Section ${section}, Period(s) [${alreadyPostedPeriods.join(', ')}] has ALREADY been posted today!`);
+        statusDiv.innerHTML = `<div class="alert">Submission Blocked: Period(s) ${alreadyPostedPeriods.join(', ')} were already recorded today.</div>`;
         return;
       }
 
       statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Submitting attendance...</div>';
 
-      const payload = {
-        employeeId: loggedInEmpId,
-        facultyName: document.getElementById('facultyName').value,
-        subjectName: document.getElementById('subjectName').value,
-        year: year,
-        section: section,
-        period: selectedPeriod,
-        sessionType: selectedOption.getAttribute('data-session'),
-        absentRollNumbers: document.getElementById('absentRolls').value
-      };
+      // Post each selected period to backend
+      let successCount = 0;
+      for (const cb of checkedBoxes) {
+        const payload = {
+          employeeId: loggedInEmpId,
+          facultyName: document.getElementById('facultyName').value,
+          subjectName: document.getElementById('subjectName').value,
+          year: year,
+          section: section,
+          period: Number(cb.value),
+          sessionType: cb.getAttribute('data-session'),
+          absentRollNumbers: document.getElementById('absentRolls').value
+        };
 
-      const res = await fetch(`${API_BASE_URL}/api/attendance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+        const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-      const data = await res.json();
-      if (res.ok) {
-        statusDiv.innerHTML = `<div class="success">Attendance recorded successfully in MongoDB!</div>`;
+        if (res.ok) successCount++;
+      }
+
+      if (successCount === checkedBoxes.length) {
+        statusDiv.innerHTML = `<div class="success">Attendance recorded successfully for ${successCount} period(s) in MongoDB!</div>`;
         document.getElementById('absentRolls').value = '';
-        loadDashboardSummary(); // Refresh dashboard data after submitting
+        checkedBoxes.forEach(cb => cb.checked = false); // Clear selections
+        loadDashboardSummary(); // Refresh dashboard data
       } else {
-        statusDiv.innerHTML = `<div class="alert">Error: ${data.error || 'Failed to submit.'}</div>`;
+        statusDiv.innerHTML = `<div class="alert">Warning: Processed ${successCount} out of ${checkedBoxes.length} periods.</div>`;
       }
 
     } catch (err) {
