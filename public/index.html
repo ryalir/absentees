@@ -945,94 +945,107 @@
   }
 
   // PDF Export Generator for Morning Present / Afternoon Absent Report
-  function downloadPartDayPDF() {
-    if (!cachedPartDayData || !cachedPartDayData.students || cachedPartDayData.students.length === 0) {
-      alert("No data available to download. Please generate the report first.");
-      return;
-    }
-
-    const deptName = document.getElementById('deptNameInput').value.trim() || 'DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING';
-    const { year, section, date, students } = cachedPartDayData;
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    // 1. Department & Document Header
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text(deptName.toUpperCase(), pageWidth / 2, 16, { align: "center" });
-
-    doc.setFontSize(11);
-    doc.setTextColor(40);
-    doc.text("MORNING PRESENT & AFTERNOON ABSENTEE REPORT", pageWidth / 2, 23, { align: "center" });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Year / Section: ${year} Year - Section ${section}`, 14, 32);
-    doc.text(`Date: ${date}`, pageWidth - 14, 32, { align: "right" });
-
-    doc.setDrawColor(200);
-    doc.setLineWidth(0.5);
-    doc.line(14, 35, pageWidth - 14, 35);
-
-    // 2. Table Data Formatting
-    const tableBody = students.map((stu, index) => [
-      index + 1,
-      stu.rollNumber,
-      'Present',
-      stu.missedAfternoonPeriods.map(p => `Period ${p}`).join(', ')
-    ]);
-
-    doc.autoTable({
-      startY: 40,
-      head: [['S.No', 'Roll Number', 'Morning Status', 'Missed Afternoon Periods']],
-      body: tableBody,
-      theme: 'grid',
-      headStyles: {
-        fillColor: [52, 152, 219],
-        textColor: 255,
-        fontStyle: 'bold',
-        halign: 'center'
-      },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 15 },
-        1: { halign: 'center', cellWidth: 45 },
-        2: { halign: 'center', cellWidth: 40 },
-        3: { halign: 'left' }
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 3
-      },
-      margin: { left: 14, right: 14 }
-    });
-
-    // 3. Signature Footer Block
-    let finalY = doc.lastAutoTable.finalY + 30;
-
-    // Ensure signature lines fit on page; if not, add a new page
-    if (finalY + 20 > pageHeight) {
-      doc.addPage();
-      finalY = 40;
-    }
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-
-    // Left Signature
-    doc.line(14, finalY, 70, finalY);
-    doc.text("Coordinator Signature", 14, finalY + 5);
-
-    // Right Signature
-    doc.line(pageWidth - 70, finalY, pageWidth - 14, finalY);
-    doc.text("Head of the Department", pageWidth - 14, finalY + 5, { align: "right" });
-
-    // Save File
-    doc.save(`Afternoon_Absentees_${year}Yr_Sec${section}_${date}.pdf`);
+// PDF Export Generator for Morning Present / Afternoon Absent Report (Print-Optimized)
+function downloadPartDayPDF() {
+  if (!cachedPartDayData || !cachedPartDayData.students || cachedPartDayData.students.length === 0) {
+    alert("No data available to download. Please generate the report first.");
+    return;
   }
+
+  const deptName = document.getElementById('deptNameInput').value.trim() || 'DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING';
+  const { year, section, date, students } = cachedPartDayData;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 14; // Standard 14mm printable margin
+
+  // 1. Table Data Formatting
+  const tableBody = students.map((stu, index) => [
+    index + 1,
+    stu.rollNumber,
+    'Present',
+    stu.missedAfternoonPeriods.map(p => `Period ${p}`).join(', ')
+  ]);
+
+  // 2. Generate AutoTable with Page Header & Safety Margins
+  doc.autoTable({
+    startY: 40,
+    head: [['S.No', 'Roll Number', 'Morning Status', 'Missed Afternoon Periods']],
+    body: tableBody,
+    theme: 'grid',
+    margin: { top: 40, bottom: 35, left: margin, right: margin }, // Reserved space for headers & signatures
+    headStyles: {
+      fillColor: [52, 152, 219],
+      textColor: 255,
+      fontStyle: 'bold',
+      halign: 'center'
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 15 },
+      1: { halign: 'center', cellWidth: 45 },
+      2: { halign: 'center', cellWidth: 40 },
+      3: { halign: 'left' }
+    },
+    styles: {
+      fontSize: 9,
+      cellPadding: 3,
+      overflow: 'linebreak'
+    },
+    didDrawPage: function (data) {
+      // Draw Header on Every Page
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(30);
+      doc.text(deptName.toUpperCase(), pageWidth / 2, 15, { align: "center" });
+
+      doc.setFontSize(10);
+      doc.text("MORNING PRESENT & AFTERNOON ABSENTEE REPORT", pageWidth / 2, 22, { align: "center" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Year / Section: ${year} Year - Section ${section}`, margin, 31);
+      doc.text(`Date: ${date}`, pageWidth - margin, 31, { align: "right" });
+
+      doc.setDrawColor(180);
+      doc.setLineWidth(0.4);
+      doc.line(margin, 34, pageWidth - margin, 34);
+
+      // Footer: Page Numbers
+      const totalPages = doc.internal.getNumberOfPages();
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text(`Page ${data.pageNumber}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+    }
+  });
+
+  // 3. Signature Block Position Calculation
+  let finalY = doc.lastAutoTable.finalY + 25;
+
+  // If signatures exceed printable page height (less than 25mm remaining), add new page
+  if (finalY > pageHeight - 25) {
+    doc.addPage();
+    finalY = 45; // Start top on new page
+  }
+
+  // Draw Signature Lines
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.5);
+  doc.setTextColor(0);
+
+  // Left Signature (Coordinator)
+  doc.line(margin, finalY, margin + 55, finalY);
+  doc.text("Coordinator Signature", margin, finalY + 5);
+
+  // Right Signature (HOD)
+  doc.line(pageWidth - margin - 55, finalY, pageWidth - margin, finalY);
+  doc.text("Head of the Department", pageWidth - margin, finalY + 5, { align: "right" });
+
+  // Save PDF
+  doc.save(`Afternoon_Absentees_${year}Yr_Sec${section}_${date}.pdf`);
+}
 </script>
 
 </body>
