@@ -435,11 +435,6 @@
     <div id="viewPartDay" class="hidden">
       <h2>Morning Present & Afternoon Absent Report</h2>
       <p style="font-size:13px; color:#666; margin-bottom: 12px;">(Lists students who attended all morning periods but were absent in the afternoon)</p>
-      
-      <div class="form-group">
-        <label>Department Name:</label>
-        <input type="text" id="deptNameInput" placeholder="e.g. Department of Computer Science & Engineering">
-      </div>
 
       <div class="report-controls">
         <select id="partYearSelect" onchange="updateSectionsOnly('partYearSelect', 'partSection')">
@@ -985,7 +980,7 @@ function downloadPartDayPDF() {
     return;
   }
 
-  const deptName = document.getElementById('deptNameInput').value.trim() || 'DEPARTMENT OF COMPUTER SCIENCE & ENGINEERING';
+  const deptName = "DEPARTMENT OF CSE-AIML";
   const { year, section, date, students } = cachedPartDayData;
 
   const { jsPDF } = window.jspdf;
