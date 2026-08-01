@@ -423,7 +423,7 @@ app.get('/api/reports/missing-periods', async (req, res) => {
     // III Year has 8 periods, IV Year has 7 periods
     const totalPeriods =
       year === "III"
-        ? [1,2,3,4,5,6,7,8]
+        ? [1,2,3,4,5,6,7]
         : [1,2,3,4,5,6,7];
 
     const records = await Attendance.find(
