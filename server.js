@@ -407,6 +407,59 @@ app.get('/api/dashboard/frequent-afternoon-absentees', async (req, res) => {
   }
 });
 
+// ==========================================
+// 7. CHECK MISSING ATTENDANCE PERIODS
+// ==========================================
+app.get('/api/reports/missing-periods', async (req, res) => {
+  try {
+    const { year, section, date } = req.query;
+
+    if (!year || !section || !date) {
+      return res.status(400).json({
+        error: "year, section and date are required."
+      });
+    }
+
+    // III Year has 8 periods, IV Year has 7 periods
+    const totalPeriods =
+      year === "III"
+        ? [1,2,3,4,5,6,7,8]
+        : [1,2,3,4,5,6,7];
+
+    const records = await Attendance.find(
+      {
+        year,
+        section,
+        dateOnly: date
+      },
+      { period: 1, _id: 0 }
+    );
+
+    const postedPeriods = records
+      .map(r => Number(r.period))
+      .sort((a, b) => a - b);
+
+    const missingPeriods = totalPeriods.filter(
+      p => !postedPeriods.includes(p)
+    );
+
+    res.status(200).json({
+      year,
+      section,
+      date,
+      totalPeriods: totalPeriods.length,
+      postedPeriods,
+      missingPeriods,
+      attendanceComplete: missingPeriods.length === 0
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
 // Fallback Route for Single Page App
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
