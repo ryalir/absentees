@@ -313,6 +313,15 @@
       </div>
     </div>
 
+    
+    <div id="missingAttendanceWidget" class="dashboard-card" style="border-left:5px solid #f39c12;">
+      <div class="dashboard-header">
+        <h3 style="margin:0;color:#2c3e50;">⏰ Missing Attendance Periods (Today)</h3>
+        <span class="badge-count" id="missingAttendanceCount" style="background:#f39c12;">Loading...</span>
+      </div>
+      <div id="missingAttendanceContent">Checking attendance...</div>
+    </div>
+
     <!-- NAVIGATION TABS -->
     <div class="nav">
       <button id="tabEntry" class="active" onclick="showTab('entry')">Mark Attendance</button>
@@ -485,6 +494,7 @@
 
       // Auto-load Home Screen Dashboard
       loadDashboardSummary();
+      loadMissingAttendanceDashboard();
     }
   });
 
@@ -615,7 +625,29 @@
     }
   }
 
-  // Submit Attendance
+  
+
+async function loadMissingAttendanceDashboard(){
+ const c=document.getElementById("missingAttendanceContent");
+ const b=document.getElementById("missingAttendanceCount");
+ const today=new Date().toISOString().split("T")[0];
+ const classes=[...["A","B","C","D","E","F","G","H"].map(s=>({year:"III",section:s})),...["A","B","C","D","E","F"].map(s=>({year:"IV",section:s}))];
+ let rows="",count=0;
+ for(const cls of classes){
+  try{
+   const r=await fetch(`${API_BASE_URL}/api/reports/missing-periods?year=${cls.year}&section=${cls.section}&date=${today}`);
+   const d=await r.json();
+   if(d.missingPeriods&&d.missingPeriods.length){
+    count++;
+    rows+=`<tr><td>${cls.year}</td><td>${cls.section}</td><td>${d.missingPeriods.join(", ")}</td></tr>`;
+   }
+  }catch(e){}
+ }
+ b.textContent=count;
+ c.innerHTML=count?`<div class="table-responsive"><table><thead><tr><th>Year</th><th>Section</th><th>Missing Periods</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="success">✓ Attendance has been posted for all sections today.</div>`;
+}
+
+// Submit Attendance
   document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const statusDiv = document.getElementById('entryStatus');
@@ -687,6 +719,7 @@
         document.getElementById('absentRolls').value = '';
         checkedBoxes.forEach(cb => cb.checked = false); // Clear selections
         loadDashboardSummary(); // Refresh dashboard data
+        loadMissingAttendanceDashboard();
       } else {
         statusDiv.innerHTML = `<div class="alert">Warning: Processed ${successCount} out of ${checkedBoxes.length} periods.</div>`;
       }
