@@ -1,84 +1,88 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bodyParser = require('body-parser');
-const webpush = require('web-push');
+const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
+// ==========================================
+// MIDDLEWARES
+// ==========================================
 app.use(cors());
-app.use(bodyParser.json());
-app.use(express.static('public')); // Serves index.html, sw.js, etc.
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// MongoDB Connection
+// Helper to get local date string YYYY-MM-DD regardless of server UTC shift
+const getLocalDateString = (d = new Date()) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// ==========================================
+// MONGODB CONFIGURATION & CONNECTION
+// ==========================================
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://satyaprasadryali_db_user:XUR8sgUQAc2qdgEp@cluster0.buejm5v.mongodb.net/student_attendance_db?retryWrites=true&w=majority&appName=Cluster0';
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('✅ Connected to MongoDB Atlas: student_attendance_db'))
+  .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
-// VAPID Configuration
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BG2McFBp82prU4M09nH1FxiYhB7HT2Hqf_j2_xe73O20IgcsNYECr9Ca3MxXpskw3KLQSqq-csXwCIw6neYYZto';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'nfkbJtZSt-3KkdArddLHmoVJdYnqKxIiI4NtVGmwDLg';
-const VAPID_MAILTO = process.env.VAPID_MAILTO || 'mailto:satyaprasad.ryali@gmail.com';
-
-webpush.setVapidDetails(VAPID_MAILTO, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-// Database Schemas
-const AttendanceSchema = new mongoose.Schema({
-  employeeId: String,
-  facultyName: String,
-  subjectName: String,
-  year: String,
-  section: String,
-  period: Number,
-  sessionType: String,
-  date: { type: String, default: () => new Date().toISOString().split('T')[0] },
-  absentRollNumbers: [String]
-});
-
-const PushSubscriptionSchema = new mongoose.Schema({
-  endpoint: { type: String, unique: true },
-  keys: mongoose.Schema.Types.Mixed,
-  createdAt: { type: Date, default: Date.now }
-});
-
-const Attendance = mongoose.model('Attendance', AttendanceSchema);
-const PushSubscription = mongoose.model('PushSubscription', PushSubscriptionSchema);
-
-// API Routes
-
-// 1. Get VAPID Public Key
-app.get('/api/push/vapid-public-key', (req, res) => {
-  res.json({ publicKey: VAPID_PUBLIC_KEY });
-});
-
-// 2. Save Web Push Subscription
-app.post('/api/push/subscribe', async (req, res) => {
-  try {
-    const subscription = req.body;
-    await PushSubscription.findOneAndUpdate(
-      { endpoint: subscription.endpoint },
-      subscription,
-      { upsert: true, new: true }
-    );
-    res.status(201).json({ status: 'success' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// Schema & Collection Mapping
+const attendanceSchema = new mongoose.Schema(
+  {
+    employeeId: { type: String, required: true },
+    facultyName: { type: String, required: true },
+    subjectName: { type: String, required: true },
+    year: { type: String, enum: ['III', 'IV'], required: true },
+    section: { type: String, required: true },
+    period: { type: Number, required: true },
+    sessionType: { type: String, enum: ['Morning', 'Afternoon'], required: true },
+    absentRollNumbers: [{ type: String, trim: true }],
+    dateTimeRecorded: { type: Date, default: Date.now },
+    dateOnly: { type: String, required: true } // YYYY-MM-DD
+  },
+  { 
+    collection: 'attendance' 
   }
-});
+);
 
-// 3. Post Attendance Record
+const Attendance = mongoose.model('Attendance', attendanceSchema, 'attendance');
+
+// Helper function to identify Morning vs Afternoon periods based on Year
+const isMorningPeriod = (year, period) => (year === 'III' ? period <= 4 : period <= 3);
+
+// ==========================================
+// API ROUTES
+// ==========================================
+
+// 1. Submit Attendance POST API
 app.post('/api/attendance', async (req, res) => {
   try {
     const { employeeId, facultyName, subjectName, year, section, period, sessionType, absentRollNumbers } = req.body;
-    
-    const formattedAbsentees = typeof absentRollNumbers === 'string'
-      ? absentRollNumbers.split(',').map(s => s.trim()).filter(Boolean)
-      : absentRollNumbers;
+
+    const now = new Date();
+    const dateOnly = getLocalDateString(now);
+
+    // Check if attendance already exists
+    const existingEntry = await Attendance.findOne({
+      year,
+      section,
+      period: Number(period),
+      dateOnly
+    });
+
+    if (existingEntry) {
+      return res.status(400).json({ 
+        error: `Attendance for Year ${year}, Section ${section}, Period ${period} has already been posted today.` 
+      });
+    }
+
+    const absentList = typeof absentRollNumbers === 'string'
+      ? absentRollNumbers.split(',').map(roll => roll.trim()).filter(Boolean)
+      : (Array.isArray(absentRollNumbers) ? absentRollNumbers.map(roll => String(roll).trim()).filter(Boolean) : []);
 
     const record = new Attendance({
       employeeId,
@@ -86,167 +90,368 @@ app.post('/api/attendance', async (req, res) => {
       subjectName,
       year,
       section,
-      period,
+      period: Number(period),
       sessionType,
-      absentRollNumbers: formattedAbsentees
+      absentRollNumbers: absentList,
+      dateTimeRecorded: now,
+      dateOnly
     });
 
-    await record.save();
-    res.status(201).json({ message: 'Attendance recorded successfully', record });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const savedRecord = await record.save();
+    res.status(201).json({ message: 'Attendance recorded successfully!', record: savedRecord });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-// 4. Daily Class Report
+// 2. Class Daily Report GET API
 app.get('/api/reports/daily', async (req, res) => {
   try {
     const { year, section, date } = req.query;
-    const records = await Attendance.find({ year, section, date }).sort({ period: 1 });
-    res.json(records);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+
+    if (!year || !section || !date) {
+      return res.status(400).json({ error: 'year, section, and date query parameters are required.' });
+    }
+
+    const records = await Attendance.find({
+      year: year,
+      section: section,
+      dateOnly: date
+    }).sort({ period: 1 });
+
+    res.status(200).json(records);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-// 5. Missing Attendance Periods Today
-app.get('/api/reports/missing-periods', async (req, res) => {
-  try {
-    const { year, section, date } = req.query;
-    const records = await Attendance.find({ year, section, date });
-    const postedPeriods = records.map(r => r.period);
-
-    const totalPeriods = (year === 'III') ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5, 6, 7];
-    const missingPeriods = totalPeriods.filter(p => !postedPeriods.includes(p));
-
-    res.json({ year, section, date, missingPeriods });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 6. Student Attendance Report
+// 3. Consolidated Student Report GET API
 app.get('/api/reports/student', async (req, res) => {
   try {
     const { year, section, rollNumber } = req.query;
-    const records = await Attendance.find({ year, section });
 
-    if (!records || records.length === 0) {
-      return res.status(404).json({ error: 'No class records found for this Year and Section.' });
+    if (!year || !section || !rollNumber) {
+      return res.status(400).json({ error: 'year, section, and rollNumber are required parameters.' });
     }
 
-    const totalSessions = records.length;
-    let absentBreakdownMap = {};
+    const cleanRoll = rollNumber.trim().toLowerCase();
+    const classRecords = await Attendance.find({ year, section });
 
-    records.forEach(r => {
-      if (r.absentRollNumbers.includes(rollNumber)) {
-        if (!absentBreakdownMap[r.date]) {
-          absentBreakdownMap[r.date] = [];
-        }
-        absentBreakdownMap[r.date].push(r.period);
+    if (!classRecords || classRecords.length === 0) {
+      return res.status(404).json({ 
+        error: `No attendance records exist for ${year} Year - Section ${section}.` 
+      });
+    }
+
+    const distinctTotalDates = [...new Set(classRecords.map(r => r.dateOnly))];
+    const totalSessions = distinctTotalDates.length;
+
+    const absentRecords = classRecords.filter(r => 
+      Array.isArray(r.absentRollNumbers) && 
+      r.absentRollNumbers.some(roll => roll.trim().toLowerCase() === cleanRoll)
+    );
+
+    const groupedByDate = {};
+    absentRecords.forEach(record => {
+      const date = record.dateOnly;
+      if (!groupedByDate[date]) {
+        groupedByDate[date] = [];
       }
+      groupedByDate[date].push(Number(record.period));
     });
 
-    const absentBreakdown = Object.keys(absentBreakdownMap).map(date => ({
-      date,
-      periods: absentBreakdownMap[date].sort((a, b) => a - b),
-      periodCount: absentBreakdownMap[date].length
-    }));
+    const formattedAbsentDetails = Object.keys(groupedByDate).map(date => {
+      const sortedPeriods = groupedByDate[date].sort((a, b) => a - b);
+      return {
+        date: date,
+        periods: sortedPeriods,
+        periodCount: sortedPeriods.length
+      };
+    });
 
-    const totalAbsentSessions = absentBreakdown.length;
-    const totalPresentSessions = totalSessions - totalAbsentSessions;
+    const totalAbsentSessions = formattedAbsentDetails.length;
+    const totalPresentSessions = Math.max(0, totalSessions - totalAbsentSessions);
 
-    res.json({
-      rollNumber,
+    const absentPercentage = totalSessions > 0 
+      ? ((totalAbsentSessions / totalSessions) * 100).toFixed(2) + '%' 
+      : '0%';
+      
+    const presentPercentage = totalSessions > 0 
+      ? ((totalPresentSessions / totalSessions) * 100).toFixed(2) + '%' 
+      : '0%';
+
+    res.status(200).json({
+      rollNumber: rollNumber.trim(),
       year,
       section,
       totalSessions,
-      totalPresentSessions,
       totalAbsentSessions,
-      presentPercentage: totalSessions ? ((totalPresentSessions / totalSessions) * 100).toFixed(2) + '%' : '0%',
-      absentPercentage: totalSessions ? ((totalAbsentSessions / totalSessions) * 100).toFixed(2) + '%' : '0%',
-      absentBreakdown
+      totalPresentSessions,
+      absentPercentage,
+      presentPercentage,
+      absentBreakdown: formattedAbsentDetails
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}); 
+
+// 4. Frequent Absentees Report GET API
+app.get('/api/reports/frequent-absentees', async (req, res) => {
+  try {
+    const { year, section } = req.query;
+
+    if (!year || !section) {
+      return res.status(400).json({ error: 'year and section parameters are required.' });
+    }
+
+    const distinctDates = await Attendance.distinct('dateOnly', { year, section });
+    distinctDates.sort();
+
+    if (distinctDates.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    const allRecords = await Attendance.find({ year, section });
+
+    const allRolls = new Set();
+    allRecords.forEach(r => {
+      (r.absentRollNumbers || []).forEach(roll => allRolls.add(roll.trim()));
+    });
+
+    const frequentAbsentees = [];
+
+    allRolls.forEach(rollNumber => {
+      let streakCount = 0;
+      let streakStartDate = null;
+      let streakStartSession = null;
+      let flagged = false;
+      let flagReason = '';
+
+      for (const date of distinctDates) {
+        if (flagged) break;
+
+        const dayRecords = allRecords.filter(r => r.dateOnly === date);
+
+        // Morning Session
+        const isAbsentMorning = dayRecords.some(r => 
+          isMorningPeriod(year, r.period) && 
+          r.absentRollNumbers.map(s => s.trim().toLowerCase()).includes(rollNumber.toLowerCase())
+        );
+
+        if (isAbsentMorning) {
+          streakCount++;
+          if (streakCount === 1) {
+            streakStartDate = date;
+            streakStartSession = 'Morning';
+          }
+          if (streakCount >= 3) {
+            flagged = true;
+            flagReason = `Absent for 3 consecutive sessions starting on ${streakStartDate} (${streakStartSession} session)`;
+            break;
+          }
+        } else {
+          streakCount = 0;
+        }
+
+        // Afternoon Session
+        const isAbsentAfternoon = dayRecords.some(r => 
+          !isMorningPeriod(year, r.period) && 
+          r.absentRollNumbers.map(s => s.trim().toLowerCase()).includes(rollNumber.toLowerCase())
+        );
+
+        if (isAbsentAfternoon) {
+          streakCount++;
+          if (streakCount === 1) {
+            streakStartDate = date;
+            streakStartSession = 'Afternoon';
+          }
+          if (streakCount >= 3) {
+            flagged = true;
+            flagReason = `Absent for 3 consecutive sessions starting on ${streakStartDate} (${streakStartSession} session)`;
+            break;
+          }
+        } else {
+          streakCount = 0;
+        }
+      }
+
+      if (flagged) {
+        frequentAbsentees.push({
+          rollNumber,
+          reason: flagReason
+        });
+      }
+    });
+
+    res.status(200).json(frequentAbsentees);
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-// 7. Morning Present & Afternoon Absent Report
+// 5. DASHBOARD ANALYSIS: Morning Present & Afternoon Absent (Single Day)
 app.get('/api/reports/morning-present-afternoon-absent', async (req, res) => {
   try {
     const { year, section, date } = req.query;
-    const records = await Attendance.find({ year, section, date });
 
-    const morningPeriods = (year === 'III') ? [1, 2, 3, 4] : [1, 2, 3];
-    const afternoonPeriods = (year === 'III') ? [5, 6, 7] : [4, 5, 6, 7];
+    if (!year || !section || !date) {
+      return res.status(400).json({ error: 'year, section, and date are required parameters.' });
+    }
 
-    const morningRecords = records.filter(r => morningPeriods.includes(r.period));
-    const afternoonRecords = records.filter(r => afternoonPeriods.includes(r.period));
+    const dayRecords = await Attendance.find({ year, section, dateOnly: date });
 
-    let morningAbsentees = new Set();
-    morningRecords.forEach(r => r.absentRollNumbers.forEach(roll => morningAbsentees.add(roll)));
-
-    let afternoonAbsentMap = {};
-    afternoonRecords.forEach(r => {
-      r.absentRollNumbers.forEach(roll => {
-        if (!afternoonAbsentMap[roll]) afternoonAbsentMap[roll] = [];
-        afternoonAbsentMap[roll].push(r.period);
+    if (!dayRecords || dayRecords.length === 0) {
+      return res.status(200).json({ 
+        message: `No attendance records submitted for ${year} Year - Section ${section} on ${date}.`,
+        students: [] 
       });
-    });
+    }
 
-    let flaggedStudents = [];
-    Object.keys(afternoonAbsentMap).forEach(roll => {
-      if (!morningAbsentees.has(roll)) {
-        flaggedStudents.push({
-          rollNumber: roll,
-          missedAfternoonPeriods: afternoonAbsentMap[roll].sort((a, b) => a - b)
-        });
+    const morningRecords = dayRecords.filter(r => isMorningPeriod(year, r.period));
+    const afternoonRecords = dayRecords.filter(r => !isMorningPeriod(year, r.period));
+
+    const afternoonAbsentRolls = new Set();
+    afternoonRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => afternoonAbsentRolls.add(roll.trim())));
+
+    const morningAbsentRolls = new Set();
+    morningRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => morningAbsentRolls.add(roll.trim())));
+
+    const targetStudents = [];
+
+    afternoonAbsentRolls.forEach(rollNumber => {
+      if (!morningAbsentRolls.has(rollNumber)) {
+        const missedAfternoonPeriods = afternoonRecords
+          .filter(r => r.absentRollNumbers.map(s => s.trim()).includes(rollNumber))
+          .map(r => r.period)
+          .sort((a, b) => a - b);
+
+        targetStudents.push({ rollNumber, missedAfternoonPeriods });
       }
     });
 
-    res.json({ date, year, section, students: flaggedStudents });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(200).json({
+      year,
+      section,
+      date,
+      totalFound: targetStudents.length,
+      students: targetStudents
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-// 8. Frequent Afternoon Absentees Summary
+// 6. DASHBOARD WIDGET ANALYSIS
 app.get('/api/dashboard/frequent-afternoon-absentees', async (req, res) => {
   try {
-    const records = await Attendance.find({});
-    let studentStats = {};
+    const allRecords = await Attendance.find({});
 
-    records.forEach(r => {
-      const isAfternoon = (r.year === 'III' && r.period >= 5) || (r.year === 'IV' && r.period >= 4);
-      if (isAfternoon) {
-        r.absentRollNumbers.forEach(roll => {
-          const key = `${r.year}-${r.section}:${roll}`;
-          if (!studentStats[key]) {
-            studentStats[key] = { classGroup: `${r.year} Year - Section ${r.section}`, rollNumber: roll, flaggedSessionsCount: 0 };
-          }
-          studentStats[key].flaggedSessionsCount++;
-        });
-      }
+    if (!allRecords || allRecords.length === 0) {
+      return res.status(200).json({ totalCount: 0, groupedData: {} });
+    }
+
+    const studentPartDaySessions = {};
+    const recordsByDay = {};
+
+    allRecords.forEach(r => {
+      const key = `${r.year}_${r.section}_${r.dateOnly}`;
+      if (!recordsByDay[key]) recordsByDay[key] = [];
+      recordsByDay[key].push(r);
     });
 
-    let groupedData = {};
+    Object.keys(recordsByDay).forEach(key => {
+      const [year, section, date] = key.split('_');
+      const dayRecords = recordsByDay[key];
+
+      const morningRecords = dayRecords.filter(r => isMorningPeriod(year, r.period));
+      const afternoonRecords = dayRecords.filter(r => !isMorningPeriod(year, r.period));
+
+      const morningAbsentRolls = new Set();
+      morningRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => morningAbsentRolls.add(roll.trim())));
+
+      const afternoonAbsentRolls = new Set();
+      afternoonRecords.forEach(r => (r.absentRollNumbers || []).forEach(roll => afternoonAbsentRolls.add(roll.trim())));
+
+      afternoonAbsentRolls.forEach(roll => {
+        if (!morningAbsentRolls.has(roll)) {
+          const studentKey = `${year}_${section}_${roll}`;
+          if (!studentPartDaySessions[studentKey]) {
+            studentPartDaySessions[studentKey] = new Set();
+          }
+          studentPartDaySessions[studentKey].add(date);
+        }
+      });
+    });
+
+    const groupedData = {};
     let totalCount = 0;
 
-    Object.values(studentStats).forEach(st => {
-      if (st.flaggedSessionsCount >= 6) {
-        if (!groupedData[st.classGroup]) groupedData[st.classGroup] = [];
-        groupedData[st.classGroup].push(st);
+    Object.keys(studentPartDaySessions).forEach(studentKey => {
+      const [year, section, roll] = studentKey.split('_');
+      const sessionCount = studentPartDaySessions[studentKey].size;
+
+      if (sessionCount >= 6) {
+        const classGroup = `${year} Year - Section ${section}`;
+        if (!groupedData[classGroup]) groupedData[classGroup] = [];
+
+        groupedData[classGroup].push({
+          rollNumber: roll,
+          flaggedSessionsCount: sessionCount
+        });
         totalCount++;
       }
     });
 
-    res.json({ totalCount, groupedData });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(200).json({ totalCount, groupedData });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// 7. CHECK MISSING ATTENDANCE PERIODS
+app.get('/api/reports/missing-periods', async (req, res) => {
+  try {
+    const { year, section, date } = req.query;
+
+    if (!year || !section || !date) {
+      return res.status(400).json({
+        error: "year, section and date are required."
+      });
+    }
+
+    const totalPeriods = [1, 2, 3, 4, 5, 6, 7];
+
+    const records = await Attendance.find(
+      { year, section, dateOnly: date },
+      { period: 1, _id: 0 }
+    );
+
+    const postedPeriods = records.map(r => Number(r.period)).sort((a, b) => a - b);
+    const missingPeriods = totalPeriods.filter(p => !postedPeriods.includes(p));
+
+    res.status(200).json({
+      year,
+      section,
+      date,
+      totalPeriods: totalPeriods.length,
+      postedPeriods,
+      missingPeriods,
+      attendanceComplete: missingPeriods.length === 0
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
