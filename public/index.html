@@ -1,604 +1,809 @@
-<script>
-  let loggedInEmpId = '';
-  let cachedPartDayData = null;
-  const API_BASE_URL = window.location.origin;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSE-AIML Attendance Management System</title>
+  
+  <!-- CDN Dependencies for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
-  // Web Push Registration Helper
-  async function registerPushNotifications() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-
-    try {
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return;
-
-      const res = await fetch(`${API_BASE_URL}/api/push/vapid-public-key`);
-      const { publicKey } = await res.json();
-      if (!publicKey) return;
-
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey)
-      });
-
-      await fetch(`${API_BASE_URL}/api/push/subscribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscription)
-      });
-    } catch (err) {
-      console.warn('Push registration skipped or failed:', err);
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+    .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2, h3, h4 { color: #2c3e50; margin-top: 0; }
+    
+    .hidden { display: none !important; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: 600; margin-bottom: 5px; color: #4a5568; }
+    input[type="text"], input[type="date"], select, textarea {
+      width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px;
     }
-  }
-
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
+    button {
+      background-color: #3182ce; color: white; border: none; padding: 10px 18px; font-size: 14px;
+      font-weight: 600; border-radius: 6px; cursor: pointer; transition: background 0.2s;
     }
-    return outputArray;
-  }
+    button:hover { background-color: #2b6cb0; }
+    button.btn-success { background-color: #38a169; }
+    button.btn-success:hover { background-color: #2f855a; }
+    
+    .nav-tabs { display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; gap: 10px; }
+    .nav-tab { padding: 10px 16px; cursor: pointer; border-radius: 6px 6px 0 0; font-weight: 600; color: #718096; }
+    .nav-tab.active { background-color: #3182ce; color: white; }
 
-  // Handle Login
-  document.getElementById('loginForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    loggedInEmpId = document.getElementById('employeeIdInput').value.trim();
-    if (loggedInEmpId) {
-      document.getElementById('loggedEmpId').innerText = loggedInEmpId;
-      document.getElementById('loginSection').classList.add('hidden');
-      document.getElementById('appSection').classList.remove('hidden');
-      updateDateTime();
-      
-      updateSectionsOnly('rptYearSelect', 'rptSection');
-      updateSectionsOnly('stuYearSelect', 'stuSection');
-      updateSectionsOnly('absYearSelect', 'absSection');
-      updateSectionsOnly('partYearSelect', 'partSection');
+    .checkbox-item { display: block; margin-bottom: 8px; font-weight: normal; }
+    .table-responsive { overflow-x: auto; margin-top: 15px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 10px 12px; border: 1px solid #e2e8f0; font-size: 13px; }
+    th { background-color: #edf2f7; color: #2d3748; }
 
-      loadDashboardSummary();
-      loadMissingAttendanceDashboard();
+    .alert { background-color: #fff5f5; color: #c53030; padding: 12px; border-radius: 6px; border: 1px solid #feb2b2; margin-top: 10px; }
+    .success { background-color: #f0fff4; color: #276749; padding: 12px; border-radius: 6px; border: 1px solid #9ae6b4; margin-top: 10px; }
+    
+    .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
+    .badge { background: #e53e3e; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+  </style>
+</head>
+<body>
 
-      // Register Browser Push
-      registerPushNotifications();
-    }
-  });
+  <div class="container">
+    <!-- LOGIN SECTION -->
+    <div id="loginSection">
+      <h2>Department Attendance Portal</h2>
+      <p style="color: #718096;">Please enter your Employee ID to proceed.</p>
+      <form id="loginForm">
+        <div class="form-group">
+          <label>Employee ID</label>
+          <input type="text" id="employeeIdInput" required placeholder="e.g. EMP101">
+        </div>
+        <button type="submit">Login</button>
+      </form>
+    </div>
 
-  function logout() {
-    loggedInEmpId = '';
-    document.getElementById('loginSection').classList.remove('hidden');
-    document.getElementById('appSection').classList.add('hidden');
-  }
+    <!-- MAIN APP SECTION -->
+    <div id="appSection" class="hidden">
+      <div class="header-bar">
+        <div>
+          <h3 style="margin: 0;">DEPARTMENT OF CSE-AIML</h3>
+          <span style="font-size: 13px; color: #718096;">LoggedIn Employee ID: <strong id="loggedEmpId"></strong></span>
+        </div>
+        <button onclick="logout()" style="background-color: #e53e3e;">Logout</button>
+      </div>
 
-  function updateDateTime() {
-    document.getElementById('autoDateTime').value = new Date().toLocaleString();
-  }
+      <!-- DASHBOARD WIDGETS -->
+      <div style="background: #ebf8ff; border: 1px solid #bee3f8; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h4 style="margin-bottom: 8px;">⚠️ Frequent Afternoon Absentees Alert (<span id="totalFlaggedCount">0</span>)</h4>
+        <div id="dashboardSummaryContent">Loading summary...</div>
+      </div>
 
-  function updateOptions(yearElemId, secElemId, periodContainerId) {
-    const year = document.getElementById(yearElemId).value;
-    const sectionSelect = document.getElementById(secElemId);
-    const periodContainer = document.getElementById(periodContainerId);
+      <div style="background: #fffaf0; border: 1px solid #feebc8; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h4 style="margin-bottom: 8px;">📋 Missing Attendance Dashboard Today (<span id="missingAttendanceCount">0</span>)</h4>
+        <div id="missingAttendanceContent">Loading missing periods status...</div>
+      </div>
 
-    sectionSelect.innerHTML = '';
-    periodContainer.innerHTML = '';
+      <!-- NAVIGATION TABS -->
+      <div class="nav-tabs">
+        <div class="nav-tab active" id="tabEntry" onclick="showTab('entry')">Post Attendance</div>
+        <div class="nav-tab" id="tabClass" onclick="showTab('class')">Class Report</div>
+        <div class="nav-tab" id="tabStudent" onclick="showTab('student')">Student Report</div>
+        <div class="nav-tab" id="tabAbsentees" onclick="showTab('absentees')">Frequent Absentees</div>
+        <div class="nav-tab" id="tabPartDay" onclick="showTab('partDay')">Part-Day Absentees</div>
+      </div>
 
-    let morningPeriods = [];
-    let afternoonPeriods = [];
+      <!-- TAB 1: POST ATTENDANCE -->
+      <div id="viewEntry">
+        <form id="attendanceForm">
+          <div class="form-group">
+            <label>Date & Time</label>
+            <input type="text" id="autoDateTime" readonly>
+          </div>
+          <div class="form-group">
+            <label>Faculty Name</label>
+            <input type="text" id="facultyName" required placeholder="Enter Faculty Name">
+          </div>
+          <div class="form-group">
+            <label>Subject Name</label>
+            <input type="text" id="subjectName" required placeholder="Enter Subject Name">
+          </div>
+          <div class="form-group">
+            <label>Year</label>
+            <select id="yearSelect" onchange="updateOptions('yearSelect', 'sectionSelect', 'periodContainer')" required>
+              <option value="">-- Select Year --</option>
+              <option value="III">III Year</option>
+              <option value="IV">IV Year</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Section</label>
+            <select id="sectionSelect" required></select>
+          </div>
+          <div class="form-group">
+            <label>Select Period(s)</label>
+            <div id="periodContainer" style="background: #f7fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+              <div style="color: #888; font-size: 13px;">Please select Year first to load periods.</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Absent Roll Numbers (Comma Separated)</label>
+            <textarea id="absentRolls" rows="3" placeholder="e.g. 21A91A1201, 21A91A1205"></textarea>
+          </div>
+          <button type="submit" class="btn-success">Submit Attendance</button>
+        </form>
+        <div id="entryStatus"></div>
+      </div>
 
-    if (year === 'III') {
-      ['A','B','C','D','E','F','G','H'].forEach(sec => {
-        sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
-      });
-      morningPeriods = [1, 2, 3, 4];
-      afternoonPeriods = [5, 6, 7];
-    } else if (year === 'IV') {
-      ['A','B','C','D','E','F'].forEach(sec => {
-        sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
-      });
-      morningPeriods = [1, 2, 3];
-      afternoonPeriods = [4, 5, 6, 7];
-    } else {
-      periodContainer.innerHTML = '<div style="color: #888; font-size: 13px;">Please select Year first to load periods.</div>';
-      return;
-    }
+      <!-- TAB 2: CLASS REPORT -->
+      <div id="viewClass" class="hidden">
+        <h4>Daily Class Attendance Report</h4>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <select id="rptYearSelect" onchange="updateSectionsOnly('rptYearSelect', 'rptSection')">
+            <option value="III">III Year</option>
+            <option value="IV">IV Year</option>
+          </select>
+          <select id="rptSection"></select>
+          <input type="date" id="rptDate">
+          <button onclick="fetchClassReport()">Get Report</button>
+        </div>
+        <div id="classReportResults"></div>
+      </div>
 
-    morningPeriods.forEach(p => {
-      periodContainer.innerHTML += `
-        <label class="checkbox-item">
-          <input type="checkbox" name="periodSelect" value="${p}" data-session="Morning">
-          Period ${p} (Morning Session)
-        </label>`;
-    });
+      <!-- TAB 3: STUDENT REPORT -->
+      <div id="viewStudent" class="hidden">
+        <h4>Individual Student Attendance Analysis</h4>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <select id="stuYearSelect" onchange="updateSectionsOnly('stuYearSelect', 'stuSection')">
+            <option value="III">III Year</option>
+            <option value="IV">IV Year</option>
+          </select>
+          <select id="stuSection"></select>
+          <input type="text" id="stuRollNumber" placeholder="Enter Roll Number">
+          <button onclick="fetchStudentReport()">Search</button>
+        </div>
+        <div id="studentReportResults"></div>
+      </div>
 
-    afternoonPeriods.forEach(p => {
-      periodContainer.innerHTML += `
-        <label class="checkbox-item">
-          <input type="checkbox" name="periodSelect" value="${p}" data-session="Afternoon">
-          Period ${p} (Afternoon Session)
-        </label>`;
-    });
-  }
+      <!-- TAB 4: FREQUENT ABSENTEES -->
+      <div id="viewAbsentees" class="hidden">
+        <h4>Frequent Absentees List</h4>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <select id="absYearSelect" onchange="updateSectionsOnly('absYearSelect', 'absSection')">
+            <option value="III">III Year</option>
+            <option value="IV">IV Year</option>
+          </select>
+          <select id="absSection"></select>
+          <button onclick="fetchFrequentAbsentees()">Generate List</button>
+        </div>
+        <div id="absenteesResults"></div>
+      </div>
 
-  function updateSectionsOnly(yearElemId, secElemId) {
-    const year = document.getElementById(yearElemId).value;
-    const sectionSelect = document.getElementById(secElemId);
-    sectionSelect.innerHTML = '';
+      <!-- TAB 5: PART DAY ABSENTEES -->
+      <div id="viewPartDay" class="hidden">
+        <h4>Morning Present & Afternoon Absentee Report</h4>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <select id="partYearSelect" onchange="updateSectionsOnly('partYearSelect', 'partSection')">
+            <option value="III">III Year</option>
+            <option value="IV">IV Year</option>
+          </select>
+          <select id="partSection"></select>
+          <input type="date" id="partDate">
+          <button onclick="fetchPartDayReport()">Analyze</button>
+          <button id="btnDownloadPDF" class="btn-success hidden" onclick="downloadPartDayPDF()">📄 Download PDF</button>
+        </div>
+        <div id="partDayResults"></div>
+      </div>
 
-    const sections = (year === 'III') ? ['A','B','C','D','E','F','G','H'] : ['A','B','C','D','E','F'];
-    sections.forEach(sec => {
-      sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
-    });
-  }
+    </div>
+  </div>
 
-  async function loadDashboardSummary() {
-    const container = document.getElementById('dashboardSummaryContent');
-    const countBadge = document.getElementById('totalFlaggedCount');
+  <script>
+    let loggedInEmpId = '';
+    let cachedPartDayData = null;
+    const API_BASE_URL = window.location.origin;
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/dashboard/frequent-afternoon-absentees`);
-      const data = await res.json();
+    // Web Push Registration Helper
+    async function registerPushNotifications() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-      if (!res.ok || data.error) {
-        container.innerHTML = '<div style="color:#721c24;">Failed to load dashboard summary.</div>';
-        countBadge.innerText = '0';
-        return;
-      }
-
-      countBadge.innerText = `${data.totalCount} Student(s)`;
-
-      if (data.totalCount === 0) {
-        container.innerHTML = '<div style="color:#27ae60; font-weight:bold; font-size:14px;">✓ No students have reached 6 or more afternoon absentee sessions across any section!</div>';
-        return;
-      }
-
-      let html = '';
-      Object.keys(data.groupedData).forEach(classGroup => {
-        html += `
-          <div style="margin-top:10px;">
-            <strong style="color:#2c3e50; font-size:14px;">📍 ${classGroup} (${data.groupedData[classGroup].length} Students):</strong>
-            <div class="table-responsive" style="margin-top:6px; margin-bottom:12px;">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Roll Number</th>
-                    <th>Flagged Sessions (Morning Present & Afternoon Absent)</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>`;
-
-        data.groupedData[classGroup].forEach(student => {
-          html += `
-            <tr>
-              <td><strong>${student.rollNumber}</strong></td>
-              <td><span style="color:#c53030; font-weight:bold;">${student.flaggedSessionsCount} Sessions</span></td>
-              <td><span style="background:#fff5f5; color:#c53030; padding:2px 8px; border-radius:4px; font-weight:600; font-size:12px;">Action Required</span></td>
-            </tr>`;
-        });
-
-        html += '</tbody></table></div></div>';
-      });
-
-      container.innerHTML = html;
-
-    } catch (err) {
-      container.innerHTML = `<div style="color:#721c24;">Error connecting to backend: ${err.message}</div>`;
-      countBadge.innerText = 'Error';
-    }
-  }
-
-  async function loadMissingAttendanceDashboard() {
-    const c = document.getElementById("missingAttendanceContent");
-    const b = document.getElementById("missingAttendanceCount");
-    const today = new Date().toISOString().split("T")[0];
-    const classes = [...["A","B","C","D","E","F","G","H"].map(s => ({year:"III", section:s})), ...["A","B","C","D","E","F"].map(s => ({year:"IV", section:s}))];
-    let rows = "", count = 0;
-
-    for (const cls of classes) {
       try {
-        const r = await fetch(`${API_BASE_URL}/api/reports/missing-periods?year=${cls.year}&section=${cls.section}&date=${today}`);
-        const d = await r.json();
-        if (d.missingPeriods && d.missingPeriods.length) {
-          count++;
-          rows += `<tr><td>${cls.year}</td><td>${cls.section}</td><td>${d.missingPeriods.join(", ")}</td></tr>`;
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+
+        let publicKey = 'BG2McFBp82prU4M09nH1FxiYhB7HT2Hqf_j2_xe73O20IgcsNYECr9Ca3MxXpskw3KLQSqq-csXwCIw6neYYZto';
+
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/push/vapid-public-key`);
+          const data = await res.json();
+          if (data.publicKey) publicKey = data.publicKey;
+        } catch (e) {
+          console.warn('Using default fallback VAPID public key');
         }
-      } catch(e) {}
-    }
-    b.textContent = count;
-    c.innerHTML = count ? `<div class="table-responsive"><table><thead><tr><th>Year</th><th>Section</th><th>Missing Periods</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="success">✓ Attendance has been posted for all sections today.</div>`;
-  }
 
-  document.getElementById('attendanceForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const statusDiv = document.getElementById('entryStatus');
-    statusDiv.innerHTML = '';
-
-    const year = document.getElementById('yearSelect').value;
-    const section = document.getElementById('sectionSelect').value;
-    const checkedBoxes = Array.from(document.querySelectorAll('input[name="periodSelect"]:checked'));
-
-    if (checkedBoxes.length === 0) {
-      alert("⚠️ Please select at least one period before submitting.");
-      return;
-    }
-
-    const todayDate = new Date().toISOString().split('T')[0];
-    statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Checking existing records...</div>';
-
-    try {
-      const checkRes = await fetch(`${API_BASE_URL}/api/reports/daily?year=${year}&section=${section}&date=${todayDate}`);
-      const existingRecords = await checkRes.json();
-      const selectedPeriods = checkedBoxes.map(cb => Number(cb.value));
-
-      const alreadyPostedPeriods = [];
-      if (Array.isArray(existingRecords)) {
-        existingRecords.forEach(record => {
-          if (selectedPeriods.includes(Number(record.period))) {
-            alreadyPostedPeriods.push(record.period);
-          }
+        const subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
         });
-      }
 
-      if (alreadyPostedPeriods.length > 0) {
-        alert(`⚠️ Attendance for Year ${year}, Section ${section}, Period(s) [${alreadyPostedPeriods.join(', ')}] has ALREADY been posted today!`);
-        statusDiv.innerHTML = `<div class="alert">Submission Blocked: Period(s) ${alreadyPostedPeriods.join(', ')} were already recorded today.</div>`;
-        return;
-      }
-
-      statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Submitting attendance...</div>';
-
-      let successCount = 0;
-      for (const cb of checkedBoxes) {
-        const payload = {
-          employeeId: loggedInEmpId,
-          facultyName: document.getElementById('facultyName').value,
-          subjectName: document.getElementById('subjectName').value,
-          year: year,
-          section: section,
-          period: Number(cb.value),
-          sessionType: cb.getAttribute('data-session'),
-          absentRollNumbers: document.getElementById('absentRolls').value
-        };
-
-        const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+        await fetch(`${API_BASE_URL}/api/push/subscribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(subscription)
         });
-
-        if (res.ok) successCount++;
+      } catch (err) {
+        console.warn('Push registration skipped or failed:', err);
       }
+    }
 
-      if (successCount === checkedBoxes.length) {
-        statusDiv.innerHTML = `<div class="success">Attendance recorded successfully for ${successCount} period(s) in MongoDB!</div>`;
-        document.getElementById('absentRolls').value = '';
-        checkedBoxes.forEach(cb => cb.checked = false);
+    function urlBase64ToUint8Array(base64String) {
+      if (!base64String) return new Uint8Array();
+      const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    // Handle Login
+    document.getElementById('loginForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      loggedInEmpId = document.getElementById('employeeIdInput').value.trim();
+      if (loggedInEmpId) {
+        document.getElementById('loggedEmpId').innerText = loggedInEmpId;
+        document.getElementById('loginSection').classList.add('hidden');
+        document.getElementById('appSection').classList.remove('hidden');
+        updateDateTime();
+        
+        updateSectionsOnly('rptYearSelect', 'rptSection');
+        updateSectionsOnly('stuYearSelect', 'stuSection');
+        updateSectionsOnly('absYearSelect', 'absSection');
+        updateSectionsOnly('partYearSelect', 'partSection');
+
         loadDashboardSummary();
         loadMissingAttendanceDashboard();
-      } else {
-        statusDiv.innerHTML = `<div class="alert">Warning: Processed ${successCount} out of ${checkedBoxes.length} periods.</div>`;
+
+        registerPushNotifications();
       }
-
-    } catch (err) {
-      statusDiv.innerHTML = `<div class="alert">Network error: ${err.message}</div>`;
-    }
-  });
-
-  function showTab(tabName) {
-    ['entry', 'class', 'student', 'absentees', 'partDay'].forEach(t => {
-      document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
-      document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1)).classList.remove('active');
     });
-    document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.remove('hidden');
-    document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.active = true;
-    document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
-  }
 
-  async function fetchClassReport() {
-    const yr = document.getElementById('rptYearSelect').value;
-    const sec = document.getElementById('rptSection').value;
-    const dt = document.getElementById('rptDate').value;
-
-    if (!sec || !dt) {
-      alert("Please select Section and Date.");
-      return;
+    function logout() {
+      loggedInEmpId = '';
+      document.getElementById('loginSection').classList.remove('hidden');
+      document.getElementById('appSection').classList.add('hidden');
     }
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/reports/daily?year=${yr}&section=${sec}&date=${dt}`);
-      const records = await res.json();
+    function updateDateTime() {
+      const dtElem = document.getElementById('autoDateTime');
+      if (dtElem) dtElem.value = new Date().toLocaleString();
+    }
 
-      if (!records || records.length === 0) {
-        document.getElementById('classReportResults').innerHTML = '<div class="alert">No attendance records found for the selected criteria.</div>';
+    function updateOptions(yearElemId, secElemId, periodContainerId) {
+      const year = document.getElementById(yearElemId).value;
+      const sectionSelect = document.getElementById(secElemId);
+      const periodContainer = document.getElementById(periodContainerId);
+
+      sectionSelect.innerHTML = '';
+      periodContainer.innerHTML = '';
+
+      let morningPeriods = [];
+      let afternoonPeriods = [];
+
+      if (year === 'III') {
+        ['A','B','C','D','E','F','G','H'].forEach(sec => {
+          sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
+        });
+        morningPeriods = [1, 2, 3, 4];
+        afternoonPeriods = [5, 6, 7];
+      } else if (year === 'IV') {
+        ['A','B','C','D','E','F'].forEach(sec => {
+          sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
+        });
+        morningPeriods = [1, 2, 3];
+        afternoonPeriods = [4, 5, 6, 7];
+      } else {
+        periodContainer.innerHTML = '<div style="color: #888; font-size: 13px;">Please select Year first to load periods.</div>';
         return;
       }
 
-      let html = `
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>Period</th>
-                <th>Session</th>
-                <th>Subject</th>
-                <th>Employee ID</th>
-                <th>Faculty Name</th>
-                <th>Absent Roll Numbers</th>
-              </tr>
-            </thead>
-            <tbody>`;
-
-      records.forEach(r => {
-        const absentees = r.absentRollNumbers && r.absentRollNumbers.length > 0 
-          ? r.absentRollNumbers.join(', ') 
-          : '<span style="color: green; font-weight: bold;">Nil</span>';
-
-        html += `
-          <tr>
-            <td><strong>Period ${r.period}</strong></td>
-            <td>${r.sessionType || 'N/A'}</td>
-            <td>${r.subjectName || 'N/A'}</td>
-            <td><code>${r.employeeId || 'N/A'}</code></td>
-            <td>${r.facultyName || 'N/A'}</td>
-            <td>${absentees}</td>
-          </tr>`;
+      morningPeriods.forEach(p => {
+        periodContainer.innerHTML += `
+          <label class="checkbox-item">
+            <input type="checkbox" name="periodSelect" value="${p}" data-session="Morning">
+            Period ${p} (Morning Session)
+          </label>`;
       });
 
-      html += '</tbody></table></div>';
-      document.getElementById('classReportResults').innerHTML = html;
-
-    } catch (err) {
-      document.getElementById('classReportResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
-    }
-  }
-
-  async function fetchStudentReport() {
-    const yr = document.getElementById('stuYearSelect').value;
-    const sec = document.getElementById('stuSection').value;
-    const roll = document.getElementById('stuRollNumber').value.trim();
-
-    if (!roll) {
-      alert("Please enter Roll Number.");
-      return;
+      afternoonPeriods.forEach(p => {
+        periodContainer.innerHTML += `
+          <label class="checkbox-item">
+            <input type="checkbox" name="periodSelect" value="${p}" data-session="Afternoon">
+            Period ${p} (Afternoon Session)
+          </label>`;
+      });
     }
 
-    const resultsDiv = document.getElementById('studentReportResults');
-    resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Searching student records...</div>';
+    function updateSectionsOnly(yearElemId, secElemId) {
+      const yearElem = document.getElementById(yearElemId);
+      const sectionSelect = document.getElementById(secElemId);
+      if (!yearElem || !sectionSelect) return;
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
-      const data = await res.json();
+      const year = yearElem.value;
+      sectionSelect.innerHTML = '';
 
-      if (!res.ok || data.error) {
-        resultsDiv.innerHTML = `<div class="alert">⚠️ ${data.error || 'No records found for the specified Roll Number in this Year & Section combination.'}</div>`;
+      const sections = (year === 'III') ? ['A','B','C','D','E','F','G','H'] : ['A','B','C','D','E','F'];
+      sections.forEach(sec => {
+        sectionSelect.innerHTML += `<option value="${sec}">${sec}</option>`;
+      });
+    }
+
+    async function loadDashboardSummary() {
+      const container = document.getElementById('dashboardSummaryContent');
+      const countBadge = document.getElementById('totalFlaggedCount');
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/dashboard/frequent-afternoon-absentees`);
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          container.innerHTML = '<div style="color:#721c24;">Failed to load dashboard summary.</div>';
+          countBadge.innerText = '0';
+          return;
+        }
+
+        countBadge.innerText = `${data.totalCount} Student(s)`;
+
+        if (data.totalCount === 0) {
+          container.innerHTML = '<div style="color:#27ae60; font-weight:bold; font-size:14px;">✓ No students have reached 6 or more afternoon absentee sessions across any section!</div>';
+          return;
+        }
+
+        let html = '';
+        Object.keys(data.groupedData).forEach(classGroup => {
+          html += `
+            <div style="margin-top:10px;">
+              <strong style="color:#2c3e50; font-size:14px;">📍 ${classGroup} (${data.groupedData[classGroup].length} Students):</strong>
+              <div class="table-responsive" style="margin-top:6px; margin-bottom:12px;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Roll Number</th>
+                      <th>Flagged Sessions (Morning Present & Afternoon Absent)</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>`;
+
+          data.groupedData[classGroup].forEach(student => {
+            html += `
+              <tr>
+                <td><strong>${student.rollNumber}</strong></td>
+                <td><span style="color:#c53030; font-weight:bold;">${student.flaggedSessionsCount} Sessions</span></td>
+                <td><span style="background:#fff5f5; color:#c53030; padding:2px 8px; border-radius:4px; font-weight:600; font-size:12px;">Action Required</span></td>
+              </tr>`;
+          });
+
+          html += '</tbody></table></div></div>';
+        });
+
+        container.innerHTML = html;
+
+      } catch (err) {
+        container.innerHTML = `<div style="color:#721c24;">Error connecting to backend: ${err.message}</div>`;
+        countBadge.innerText = 'Error';
+      }
+    }
+
+    async function loadMissingAttendanceDashboard() {
+      const c = document.getElementById("missingAttendanceContent");
+      const b = document.getElementById("missingAttendanceCount");
+      const today = new Date().toISOString().split("T")[0];
+      const classes = [...["A","B","C","D","E","F","G","H"].map(s => ({year:"III", section:s})), ...["A","B","C","D","E","F"].map(s => ({year:"IV", section:s}))];
+      let rows = "", count = 0;
+
+      for (const cls of classes) {
+        try {
+          const r = await fetch(`${API_BASE_URL}/api/reports/missing-periods?year=${cls.year}&section=${cls.section}&date=${today}`);
+          const d = await r.json();
+          if (d.missingPeriods && d.missingPeriods.length) {
+            count++;
+            rows += `<tr><td>${cls.year}</td><td>${cls.section}</td><td>${d.missingPeriods.join(", ")}</td></tr>`;
+          }
+        } catch(e) {}
+      }
+      b.textContent = count;
+      c.innerHTML = count ? `<div class="table-responsive"><table><thead><tr><th>Year</th><th>Section</th><th>Missing Periods</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="success">✓ Attendance has been posted for all sections today.</div>`;
+    }
+
+    document.getElementById('attendanceForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const statusDiv = document.getElementById('entryStatus');
+      statusDiv.innerHTML = '';
+
+      const year = document.getElementById('yearSelect').value;
+      const section = document.getElementById('sectionSelect').value;
+      const checkedBoxes = Array.from(document.querySelectorAll('input[name="periodSelect"]:checked'));
+
+      if (checkedBoxes.length === 0) {
+        alert("⚠️ Please select at least one period before submitting.");
         return;
       }
 
-      let html = `
-        <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:6px; border:1px solid #e2e8f0;">
-          <p style="margin: 5px 0;"><strong>Roll Number:</strong> ${data.rollNumber}</p>
-          <p style="margin: 5px 0;"><strong>Class / Section:</strong> ${data.year} Year - Section ${data.section}</p>
-          <p style="margin: 5px 0;"><strong>Total Recorded Days (Sessions):</strong> ${data.totalSessions}</p>
-          <p style="margin: 5px 0;"><strong>Present Days:</strong> ${data.totalPresentSessions} (${data.presentPercentage})</p>
-          <p style="margin: 5px 0; color: #c53030;"><strong>Absent Days (Sessions):</strong> ${data.totalAbsentSessions} (${data.absentPercentage})</p>
-        </div>
+      const todayDate = new Date().toISOString().split('T')[0];
+      statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Checking existing records...</div>';
 
-        <h4 style="margin-top: 20px; color: #2c3e50;">Absent Breakdown by Date</h4>`;
+      try {
+        const checkRes = await fetch(`${API_BASE_URL}/api/reports/daily?year=${year}&section=${section}&date=${todayDate}`);
+        const existingRecords = await checkRes.json();
+        const selectedPeriods = checkedBoxes.map(cb => Number(cb.value));
 
-      if (!data.absentBreakdown || data.absentBreakdown.length === 0) {
-        html += `<div class="success">No absences recorded for Roll Number ${data.rollNumber}! 100% Attendance recorded.</div>`;
-      } else {
-        html += `
+        const alreadyPostedPeriods = [];
+        if (Array.isArray(existingRecords)) {
+          existingRecords.forEach(record => {
+            if (selectedPeriods.includes(Number(record.period))) {
+              alreadyPostedPeriods.push(record.period);
+            }
+          });
+        }
+
+        if (alreadyPostedPeriods.length > 0) {
+          alert(`⚠️ Attendance for Year ${year}, Section ${section}, Period(s) [${alreadyPostedPeriods.join(', ')}] has ALREADY been posted today!`);
+          statusDiv.innerHTML = `<div class="alert">Submission Blocked: Period(s) ${alreadyPostedPeriods.join(', ')} were already recorded today.</div>`;
+          return;
+        }
+
+        statusDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Submitting attendance...</div>';
+
+        let successCount = 0;
+        for (const cb of checkedBoxes) {
+          const payload = {
+            employeeId: loggedInEmpId,
+            facultyName: document.getElementById('facultyName').value,
+            subjectName: document.getElementById('subjectName').value,
+            year: year,
+            section: section,
+            period: Number(cb.value),
+            sessionType: cb.getAttribute('data-session'),
+            absentRollNumbers: document.getElementById('absentRolls').value
+          };
+
+          const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (res.ok) successCount++;
+        }
+
+        if (successCount === checkedBoxes.length) {
+          statusDiv.innerHTML = `<div class="success">Attendance recorded successfully for ${successCount} period(s) in MongoDB!</div>`;
+          document.getElementById('absentRolls').value = '';
+          checkedBoxes.forEach(cb => cb.checked = false);
+          loadDashboardSummary();
+          loadMissingAttendanceDashboard();
+        } else {
+          statusDiv.innerHTML = `<div class="alert">Warning: Processed ${successCount} out of ${checkedBoxes.length} periods.</div>`;
+        }
+
+      } catch (err) {
+        statusDiv.innerHTML = `<div class="alert">Network error: ${err.message}</div>`;
+      }
+    });
+
+    function showTab(tabName) {
+      ['entry', 'class', 'student', 'absentees', 'partDay'].forEach(t => {
+        document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.add('hidden');
+        document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.remove('active');
+      });
+      document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1))?.classList.remove('hidden');
+      document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1))?.classList.add('active');
+    }
+
+    async function fetchClassReport() {
+      const yr = document.getElementById('rptYearSelect').value;
+      const sec = document.getElementById('rptSection').value;
+      const dt = document.getElementById('rptDate').value;
+
+      if (!sec || !dt) {
+        alert("Please select Section and Date.");
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/reports/daily?year=${yr}&section=${sec}&date=${dt}`);
+        const records = await res.json();
+
+        if (!records || records.length === 0) {
+          document.getElementById('classReportResults').innerHTML = '<div class="alert">No attendance records found for the selected criteria.</div>';
+          return;
+        }
+
+        let html = `
           <div class="table-responsive">
             <table>
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Absent Periods (Ascending)</th>
-                  <th>Total Periods Missed</th>
-                  <th>Session Contribution</th>
+                  <th>Period</th>
+                  <th>Session</th>
+                  <th>Subject</th>
+                  <th>Employee ID</th>
+                  <th>Faculty Name</th>
+                  <th>Absent Roll Numbers</th>
                 </tr>
               </thead>
               <tbody>`;
 
-        data.absentBreakdown.forEach(item => {
-          const formattedPeriods = item.periods.map(p => `Period ${p}`).join(', ');
+        records.forEach(r => {
+          const absentees = r.absentRollNumbers && r.absentRollNumbers.length > 0 
+            ? r.absentRollNumbers.join(', ') 
+            : '<span style="color: green; font-weight: bold;">Nil</span>';
 
           html += `
             <tr>
-              <td><strong>${item.date}</strong></td>
-              <td><span style="color:#e53e3e; font-weight:600;">${formattedPeriods}</span></td>
-              <td>${item.periodCount} Period(s)</td>
-              <td><strong>1 Session</strong></td>
+              <td><strong>Period ${r.period}</strong></td>
+              <td>${r.sessionType || 'N/A'}</td>
+              <td>${r.subjectName || 'N/A'}</td>
+              <td><code>${r.employeeId || 'N/A'}</code></td>
+              <td>${r.facultyName || 'N/A'}</td>
+              <td>${absentees}</td>
             </tr>`;
         });
 
         html += '</tbody></table></div>';
+        document.getElementById('classReportResults').innerHTML = html;
+
+      } catch (err) {
+        document.getElementById('classReportResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
+      }
+    }
+
+    async function fetchStudentReport() {
+      const yr = document.getElementById('stuYearSelect').value;
+      const sec = document.getElementById('stuSection').value;
+      const roll = document.getElementById('stuRollNumber').value.trim();
+
+      if (!roll) {
+        alert("Please enter Roll Number.");
+        return;
       }
 
-      resultsDiv.innerHTML = html;
+      const resultsDiv = document.getElementById('studentReportResults');
+      resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Searching student records...</div>';
 
-    } catch (err) {
-      resultsDiv.innerHTML = `<div class="alert">Network Error: ${err.message}</div>`;
-    }
-  }
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/reports/student?year=${yr}&section=${sec}&rollNumber=${roll}`);
+        const data = await res.json();
 
-  async function fetchFrequentAbsentees() {
-    const yr = document.getElementById('absYearSelect').value;
-    const sec = document.getElementById('absSection').value;
+        if (!res.ok || data.error) {
+          resultsDiv.innerHTML = `<div class="alert">⚠️ ${data.error || 'No records found.'}</div>`;
+          return;
+        }
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/reports/frequent-absentees?year=${yr}&section=${sec}`);
-      const list = await res.json();
+        let html = `
+          <div style="margin-top:15px; background:#f8f9fa; padding:15px; border-radius:6px; border:1px solid #e2e8f0;">
+            <p style="margin: 5px 0;"><strong>Roll Number:</strong> ${data.rollNumber}</p>
+            <p style="margin: 5px 0;"><strong>Class / Section:</strong> ${data.year} Year - Section ${data.section}</p>
+            <p style="margin: 5px 0;"><strong>Total Recorded Days (Sessions):</strong> ${data.totalSessions}</p>
+            <p style="margin: 5px 0;"><strong>Present Days:</strong> ${data.totalPresentSessions} (${data.presentPercentage})</p>
+            <p style="margin: 5px 0; color: #c53030;"><strong>Absent Days (Sessions):</strong> ${data.totalAbsentSessions} (${data.absentPercentage})</p>
+          </div>
 
-      let html = `
-        <div class="table-responsive">
-          <table>
-            <thead>
+          <h4 style="margin-top: 20px; color: #2c3e50;">Absent Breakdown by Date</h4>`;
+
+        if (!data.absentBreakdown || data.absentBreakdown.length === 0) {
+          html += `<div class="success">No absences recorded for Roll Number ${data.rollNumber}! 100% Attendance recorded.</div>`;
+        } else {
+          html += `
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Absent Periods (Ascending)</th>
+                    <th>Total Periods Missed</th>
+                    <th>Session Contribution</th>
+                  </tr>
+                </thead>
+                <tbody>`;
+
+          data.absentBreakdown.forEach(item => {
+            const formattedPeriods = item.periods.map(p => `Period ${p}`).join(', ');
+
+            html += `
               <tr>
-                <th>Roll Number</th>
-                <th>Status Flag</th>
-              </tr>
-            </thead>
-            <tbody>`;
+                <td><strong>${item.date}</strong></td>
+                <td><span style="color:#e53e3e; font-weight:600;">${formattedPeriods}</span></td>
+                <td>${item.periodCount} Period(s)</td>
+                <td><strong>1 Session</strong></td>
+              </tr>`;
+          });
 
-      (list || []).forEach(item => {
-        html += `<tr><td><strong>${item.rollNumber}</strong></td><td style="color:red;">${item.reason}</td></tr>`;
+          html += '</tbody></table></div>';
+        }
+
+        resultsDiv.innerHTML = html;
+
+      } catch (err) {
+        resultsDiv.innerHTML = `<div class="alert">Network Error: ${err.message}</div>`;
+      }
+    }
+
+    async function fetchFrequentAbsentees() {
+      const yr = document.getElementById('absYearSelect').value;
+      const sec = document.getElementById('absSection').value;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/reports/frequent-absentees?year=${yr}&section=${sec}`);
+        const list = await res.json();
+
+        let html = `
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Roll Number</th>
+                  <th>Status Flag</th>
+                </tr>
+              </thead>
+              <tbody>`;
+
+        (list || []).forEach(item => {
+          html += `<tr><td><strong>${item.rollNumber}</strong></td><td style="color:red;">${item.reason}</td></tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        document.getElementById('absenteesResults').innerHTML = (list && list.length) ? html : '<div class="success">No frequent absentees found!</div>';
+      } catch (err) {
+        document.getElementById('absenteesResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
+      }
+    }
+
+    async function fetchPartDayReport() {
+      const yr = document.getElementById('partYearSelect').value;
+      const sec = document.getElementById('partSection').value;
+      const dt = document.getElementById('partDate').value;
+      const pdfBtn = document.getElementById('btnDownloadPDF');
+
+      if (!sec || !dt) {
+        alert("Please select Section and Date.");
+        return;
+      }
+
+      const resultsDiv = document.getElementById('partDayResults');
+      resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Analyzing attendance records...</div>';
+      pdfBtn.classList.add('hidden');
+      cachedPartDayData = null;
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/reports/morning-present-afternoon-absent?year=${yr}&section=${sec}&date=${dt}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          resultsDiv.innerHTML = `<div class="alert">⚠️ ${data.error || 'Failed to fetch report.'}</div>`;
+          return;
+        }
+
+        if (!data.students || data.students.length === 0) {
+          resultsDiv.innerHTML = '<div class="success">No students found who were present in the morning but absent in the afternoon on this date!</div>';
+          return;
+        }
+
+        cachedPartDayData = { year: yr, section: sec, date: dt, students: data.students };
+
+        let html = `
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Roll Number</th>
+                  <th>Morning Status</th>
+                  <th>Afternoon Missed Periods</th>
+                </tr>
+              </thead>
+              <tbody>`;
+
+        data.students.forEach(item => {
+          const formattedPeriods = item.missedAfternoonPeriods.map(p => `Period ${p}`).join(', ');
+
+          html += `
+            <tr>
+              <td><strong>${item.rollNumber}</strong></td>
+              <td><span style="color: green; font-weight: bold;">Present (0 Absences)</span></td>
+              <td><span style="color: #c53030; font-weight: bold;">${formattedPeriods}</span></td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        resultsDiv.innerHTML = html;
+        pdfBtn.classList.remove('hidden');
+
+      } catch (err) {
+        resultsDiv.innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
+      }
+    }
+
+    function downloadPartDayPDF() {
+      if (!cachedPartDayData || !cachedPartDayData.students || cachedPartDayData.students.length === 0) {
+        alert("No data available to download.");
+        return;
+      }
+
+      const deptName = "DEPARTMENT OF CSE-AIML";
+      const { year, section, date, students } = cachedPartDayData;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 14;
+
+      const tableBody = students.map((stu, index) => [
+        index + 1,
+        stu.rollNumber,
+        'Present',
+        stu.missedAfternoonPeriods.map(p => `Period ${p}`).join(', ')
+      ]);
+
+      doc.autoTable({
+        startY: 40,
+        head: [['S.No', 'Roll Number', 'Morning Status', 'Missed Afternoon Periods']],
+        body: tableBody,
+        theme: 'grid',
+        margin: { top: 40, bottom: 35, left: margin, right: margin },
+        headStyles: { fillColor: [52, 152, 219], textColor: 255, fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 15 },
+          1: { halign: 'center', cellWidth: 45 },
+          2: { halign: 'center', cellWidth: 40 },
+          3: { halign: 'left' }
+        },
+        styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
+        didDrawPage: function (data) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(13);
+          doc.setTextColor(30);
+          doc.text(deptName.toUpperCase(), pageWidth / 2, 15, { align: "center" });
+
+          doc.setFontSize(10);
+          doc.text("MORNING PRESENT & AFTERNOON ABSENTEE REPORT", pageWidth / 2, 22, { align: "center" });
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.text(`Year / Section: ${year} Year - Section ${section}`, margin, 31);
+          doc.text(`Date: ${date}`, pageWidth - margin, 31, { align: "right" });
+
+          doc.setDrawColor(180);
+          doc.setLineWidth(0.4);
+          doc.line(margin, 34, pageWidth - margin, 34);
+
+          doc.setFontSize(8);
+          doc.setTextColor(120);
+          doc.text(`Page ${data.pageNumber}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+        }
       });
 
-      html += '</tbody></table></div>';
-      document.getElementById('absenteesResults').innerHTML = (list && list.length) ? html : '<div class="success">No frequent absentees found!</div>';
-    } catch (err) {
-      document.getElementById('absenteesResults').innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
-    }
-  }
-
-  async function fetchPartDayReport() {
-    const yr = document.getElementById('partYearSelect').value;
-    const sec = document.getElementById('partSection').value;
-    const dt = document.getElementById('partDate').value;
-    const pdfBtn = document.getElementById('btnDownloadPDF');
-
-    if (!sec || !dt) {
-      alert("Please select Section and Date.");
-      return;
-    }
-
-    const resultsDiv = document.getElementById('partDayResults');
-    resultsDiv.innerHTML = '<div style="color: #666; margin-top: 10px;">Analyzing attendance records...</div>';
-    pdfBtn.classList.add('hidden');
-    cachedPartDayData = null;
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/reports/morning-present-afternoon-absent?year=${yr}&section=${sec}&date=${dt}`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        resultsDiv.innerHTML = `<div class="alert">⚠️ ${data.error || 'Failed to fetch report.'}</div>`;
-        return;
+      let finalY = doc.lastAutoTable.finalY + 25;
+      if (finalY > pageHeight - 25) {
+        doc.addPage();
+        finalY = 45;
       }
 
-      if (data.message) {
-        resultsDiv.innerHTML = `<div class="alert">${data.message}</div>`;
-        return;
-      }
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(0);
 
-      if (!data.students || data.students.length === 0) {
-        resultsDiv.innerHTML = '<div class="success">No students found who were present in the morning but absent in the afternoon on this date!</div>';
-        return;
-      }
+      doc.line(margin, finalY, margin + 55, finalY);
+      doc.text("Coordinator Signature", margin, finalY + 5);
 
-      cachedPartDayData = { year: yr, section: sec, date: dt, students: data.students };
+      doc.line(pageWidth - margin - 55, finalY, pageWidth - margin, finalY);
+      doc.text("Head of the Department", pageWidth - margin, finalY + 5, { align: "right" });
 
-      let html = `
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>Roll Number</th>
-                <th>Morning Status</th>
-                <th>Afternoon Missed Periods</th>
-              </tr>
-            </thead>
-            <tbody>`;
-
-      data.students.forEach(item => {
-        const formattedPeriods = item.missedAfternoonPeriods.map(p => `Period ${p}`).join(', ');
-
-        html += `
-          <tr>
-            <td><strong>${item.rollNumber}</strong></td>
-            <td><span style="color: green; font-weight: bold;">Present (0 Absences)</span></td>
-            <td><span style="color: #c53030; font-weight: bold;">${formattedPeriods}</span></td>
-          </tr>`;
-      });
-
-      html += '</tbody></table></div>';
-      resultsDiv.innerHTML = html;
-      pdfBtn.classList.remove('hidden');
-
-    } catch (err) {
-      resultsDiv.innerHTML = `<div class="alert">Error loading report: ${err.message}</div>`;
+      doc.save(`Afternoon_Absentees_${year}Yr_Sec${section}_${date}.pdf`);
     }
-  }
-
-  function downloadPartDayPDF() {
-    if (!cachedPartDayData || !cachedPartDayData.students || cachedPartDayData.students.length === 0) {
-      alert("No data available to download. Please generate the report first.");
-      return;
-    }
-
-    const deptName = "DEPARTMENT OF CSE-AIML";
-    const { year, section, date, students } = cachedPartDayData;
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 14;
-
-    const tableBody = students.map((stu, index) => [
-      index + 1,
-      stu.rollNumber,
-      'Present',
-      stu.missedAfternoonPeriods.map(p => `Period ${p}`).join(', ')
-    ]);
-
-    doc.autoTable({
-      startY: 40,
-      head: [['S.No', 'Roll Number', 'Morning Status', 'Missed Afternoon Periods']],
-      body: tableBody,
-      theme: 'grid',
-      margin: { top: 40, bottom: 35, left: margin, right: margin },
-      headStyles: { fillColor: [52, 152, 219], textColor: 255, fontStyle: 'bold', halign: 'center' },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 15 },
-        1: { halign: 'center', cellWidth: 45 },
-        2: { halign: 'center', cellWidth: 40 },
-        3: { halign: 'left' }
-      },
-      styles: { fontSize: 9, cellPadding: 3, overflow: 'linebreak' },
-      didDrawPage: function (data) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(30);
-        doc.text(deptName.toUpperCase(), pageWidth / 2, 15, { align: "center" });
-
-        doc.setFontSize(10);
-        doc.text("MORNING PRESENT & AFTERNOON ABSENTEE REPORT", pageWidth / 2, 22, { align: "center" });
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.text(`Year / Section: ${year} Year - Section ${section}`, margin, 31);
-        doc.text(`Date: ${date}`, pageWidth - margin, 31, { align: "right" });
-
-        doc.setDrawColor(180);
-        doc.setLineWidth(0.4);
-        doc.line(margin, 34, pageWidth - margin, 34);
-
-        doc.setFontSize(8);
-        doc.setTextColor(120);
-        doc.text(`Page ${data.pageNumber}`, pageWidth / 2, pageHeight - 8, { align: "center" });
-      }
-    });
-
-    let finalY = doc.lastAutoTable.finalY + 25;
-    if (finalY > pageHeight - 25) {
-      doc.addPage();
-      finalY = 45;
-    }
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.setTextColor(0);
-
-    doc.line(margin, finalY, margin + 55, finalY);
-    doc.text("Coordinator Signature", margin, finalY + 5);
-
-    doc.line(pageWidth - margin - 55, finalY, pageWidth - margin, finalY);
-    doc.text("Head of the Department", pageWidth - margin, finalY + 5, { align: "right" });
-
-    doc.save(`Afternoon_Absentees_${year}Yr_Sec${section}_${date}.pdf`);
-  }
-</script>
+  </script>
+</body>
+</html>
