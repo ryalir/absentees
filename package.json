@@ -9,6 +9,8 @@
     "express": "^4.19.2",
     "mongoose": "^8.2.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "web-push": "^3.6.7"
   }
 }
