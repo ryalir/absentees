@@ -14,7 +14,8 @@ app.use(bodyParser.json());
 app.use(express.static('public')); // Serves index.html, sw.js, etc.
 
 // MongoDB Connection
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/attendance_db';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://satyaprasadryali_db_user:XUR8sgUQAc2qdgEp@cluster0.buejm5v.mongodb.net/student_attendance_db?retryWrites=true&w=majority&appName=Cluster0';
+
 mongoose.connect(MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
@@ -22,7 +23,7 @@ mongoose.connect(MONGO_URI)
 // VAPID Configuration
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BG2McFBp82prU4M09nH1FxiYhB7HT2Hqf_j2_xe73O20IgcsNYECr9Ca3MxXpskw3KLQSqq-csXwCIw6neYYZto';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'nfkbJtZSt-3KkdArddLHmoVJdYnqKxIiI4NtVGmwDLg';
-const VAPID_MAILTO = process.env.VAPID_MAILTO || 'mailto:admin@example.com';
+const VAPID_MAILTO = process.env.VAPID_MAILTO || 'mailto:satyaprasad.ryali@gmail.com';
 
 webpush.setVapidDetails(VAPID_MAILTO, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
